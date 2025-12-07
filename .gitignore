@@ -37,6 +37,10 @@ wheels/
 .DS_Store
 Thumbs.db
 
+# Test files
+**/02-*.ipynb
+**/03-*.ipynb
+
 
 
 
