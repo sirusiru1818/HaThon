@@ -1,4 +1,4 @@
-# main.py
+# category.py
 import os
 from fastapi import FastAPI
 from pydantic import BaseModel, Field
@@ -6,7 +6,10 @@ from enum import Enum
 from dotenv import load_dotenv
 
 from langchain_aws import ChatBedrockConverse  # 새로 추가
-from langchain_core.prompts import ChatPromptTemplate
+from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
+from langchain_core.chat_history import BaseChatMessageHistory, InMemoryChatMessageHistory
+from langchain_core.runnables.history import RunnableWithMessageHistory
+import uuid
 
 # .env 파일에서 환경 변수 로드
 load_dotenv()
@@ -111,17 +114,62 @@ kiosk_prompt = ChatPromptTemplate([
 kiosk_llm = llm.with_structured_output(CategoryClassifier)
 kiosk_chain = kiosk_prompt | kiosk_llm
 
+# 세션별 히스토리 저장소 (etc 카테고리일 때 대화 유도를 위한 세션 관리)
+session_store = {}
+
+def get_session_history(session_id: str) -> BaseChatMessageHistory:
+    """세션 ID에 해당하는 히스토리를 반환하거나 새로 생성"""
+    if session_id not in session_store:
+        session_store[session_id] = InMemoryChatMessageHistory()
+    return session_store[session_id]
+
+# etc 카테고리일 때 다른 카테고리로 유도하기 위한 프롬프트
+etc_guidance_prompt = ChatPromptTemplate.from_messages([
+    ("system", """당신은 행정복지센터 키오스크 상담원입니다. 
+사용자가 etc 카테고리(일반 대화, 인사 등)로 분류된 질문을 하고 있습니다.
+이전 대화 히스토리를 참고하여, 사용자를 자연스럽게 다음 5개 서비스 중 하나로 유도하세요:
+
+1. 국민연금: 국민연금 가입, 납부, 수급 관련
+2. 전입신고: 전입신고, 주소변경, 주민등록 관련
+3. 토지-건축물: 토지, 건축물, 부동산 등기 관련
+4. 청년월세: 청년월세 지원금, 청년주거급여 관련
+5. 주거급여: 주거급여 신청, 자격, 절차 관련
+
+대화 유도 원칙:
+- 이전 대화 맥락을 고려하여 자연스럽게 관련 서비스를 제안하세요
+- 강압적이지 않게, 친절하고 자연스럽게 유도하세요
+- 사용자의 상황(나이, 주거 상황 등)을 파악하여 적절한 서비스를 추천하세요
+- 간결하되 문장이 자연스럽게 이어지도록 답변하세요 (300자 이내)
+- 답변 끝에는 '도와드릴까요?', '필요하신가요?', '궁금하신가요?' 같은 의문 뉘앙스로 자연스럽게 끝내세요"""),
+    MessagesPlaceholder(variable_name="history"),  # 대화 히스토리 주입
+    ("human", "{question}")
+])
+
+# etc 카테고리 유도용 체인
+etc_guidance_chain = etc_guidance_prompt | llm
+
+# RunnableWithMessageHistory로 래핑하여 세션별 히스토리 관리
+etc_guidance_chain_with_history = RunnableWithMessageHistory(
+    etc_guidance_chain,
+    get_session_history,
+    input_messages_key="question",
+    history_messages_key="history"
+)
+
 # STT 모듈이 나중에 보내줄 데이터 형식
 class UserInquiry(BaseModel):
     text: str  # STT 모듈에서 변환된 사용자 질문 텍스트
+    session_id: str | None = Field(default=None, description="세션 ID (etc 카테고리일 때 대화 유도를 위해 사용)")
 
 @app.post("/process")
 async def process_inquiry(input_data: UserInquiry):
     """
     행정복지센터 키오스크에서 사용자 질문을 받아 카테고리 분류 및 답변을 제공하는 엔드포인트.
     음성 모듈(STT)에서 변환된 텍스트를 받아 처리합니다.
+    category가 etc일 경우 세션을 유지하며 다른 카테고리로 유도합니다.
     """
     user_question = input_data.text
+    session_id = input_data.session_id or str(uuid.uuid4())  # session_id가 없으면 새로 생성
 
     try:
         # 프롬프트에 포맷될 데이터 생성
@@ -137,7 +185,37 @@ async def process_inquiry(input_data: UserInquiry):
         if not hasattr(response, 'category') or not hasattr(response, 'answer') or not hasattr(response, 'reason'):
             raise ValueError("LLM 응답에 필수 속성이 없습니다.")
 
-        # 응답 길이 제한 (300자 초과 시 자르기)
+        # category가 etc인 경우, 세션을 유지하며 다른 카테고리로 유도
+        if response.category.value == "etc":
+            # 세션 히스토리를 활용하여 대화 유도
+            config = {"configurable": {"session_id": session_id}}
+            
+            # 세션 히스토리와 함께 대화 유도 체인 실행
+            guidance_response = etc_guidance_chain_with_history.invoke(
+                {"question": user_question},
+                config=config
+            )
+            
+            # 유도 응답 추출
+            if hasattr(guidance_response, 'content'):
+                guidance_answer = guidance_response.content[:300]
+            else:
+                guidance_answer = str(guidance_response)[:300]
+            
+            # 유도된 대화를 기반으로 다시 카테고리 분류 시도
+            # (사용자의 다음 응답이 다른 카테고리로 분류될 수 있도록)
+            result = {
+                "question": user_question,
+                "category": "etc",
+                "answer": guidance_answer,
+                "message": "질문이 정상적으로 처리되었습니다. 다른 서비스로 유도 중입니다.",
+                "reason": response.reason,
+                "session_id": session_id,  # 세션 ID 반환하여 클라이언트가 유지할 수 있도록
+                "is_guidance": True  # 유도 중임을 표시
+            }
+            return result
+
+        # etc가 아닌 경우 정상 처리
         answer_text = response.answer[:300] if len(response.answer) > 300 else response.answer
 
         result = {
@@ -145,7 +223,8 @@ async def process_inquiry(input_data: UserInquiry):
             "category": response.category.value,  # Enum의 value 반환
             "answer": answer_text,
             "message": "질문이 정상적으로 처리되었습니다.",
-            "reason": response.reason
+            "reason": response.reason,
+            "session_id": session_id
         }
         return result
     
@@ -174,5 +253,6 @@ async def process_inquiry(input_data: UserInquiry):
             "answer": answer,
             "message": "질문이 정상적으로 처리되었습니다.",
             "reason": "오류 발생으로 etc 카테고리로 분류되었습니다.",
+            "session_id": session_id,
             "error": str(e)
         }
