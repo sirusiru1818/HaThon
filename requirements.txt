@@ -1,0 +1,9 @@
+fastapi
+uvicorn[standard]
+pydantic
+python-dotenv
+
+langchain<1.0.0
+langgraph
+langchain_aws
+pillow
