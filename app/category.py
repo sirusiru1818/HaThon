@@ -581,11 +581,21 @@ async def voice_process(request: VoiceTextRequest):
                 "transcribed_text": transcribed_text
             }
         
+        print(f"[FORM DEBUG] 폼 세션 요청 시작 - session_id: {request.form_session_id}")
+        print(f"[FORM DEBUG] 사용자 입력: {transcribed_text}")
+        print(f"[FORM DEBUG] 카테고리: {request.category}")
+        
         form_result = await process_form_conversation(
             session_id=request.form_session_id,
             user_input=transcribed_text,
             category=request.category
         )
+        
+        print(f"[FORM DEBUG] 폼 응답 받음:")
+        print(f"[FORM DEBUG]   - response: {form_result.get('response', 'None')[:150]}")
+        print(f"[FORM DEBUG]   - unfilled_count: {form_result.get('unfilled_count')}")
+        print(f"[FORM DEBUG]   - completed: {form_result.get('completed')}")
+        print(f"[FORM DEBUG]   - extracted_fields: {form_result.get('extracted_fields', {})}")
         
         add_log(
             "form_response",

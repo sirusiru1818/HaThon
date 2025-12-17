@@ -330,6 +330,12 @@ form_filling_prompt = ChatPromptTemplate.from_messages([
 아직 채워지지 않은 필드들:
 {unfilled_fields}
 
+⚠️ 중요한 규칙:
+1. 위에 "아직 채워지지 않은 필드들" 목록이 비어있지 않으면, 절대로 "작성 완료", "완료되었습니다", "끝났습니다" 같은 말을 하지 마세요!
+2. 미작성 필드가 남아있는 한, 계속해서 정보를 수집해야 합니다.
+3. 사용자가 "필요없어", "모르겠어", "아니" 같은 말을 해도, 친절하게 설명하고 다시 질문하세요.
+4. 모든 필드가 실제로 채워질 때까지 작성은 끝나지 않습니다.
+
 대화 원칙:
 1. 한 번에 1-2개의 정보만 자연스럽게 물어보세요.
 2. 사용자가 제공한 정보를 확인하고, 다음 필요한 정보를 물어보세요.
@@ -337,11 +343,13 @@ form_filling_prompt = ChatPromptTemplate.from_messages([
 4. 친절하고 자연스러운 대화체를 사용하세요.
 5. 필드명을 직접 언급하지 말고, 자연스러운 질문으로 정보를 수집하세요.
 6. 답변은 300자 이내로 간결하게 작성하세요.
+7. 사용자가 정보 제공을 거부하면, 왜 필요한지 간단히 설명하고 다시 요청하세요.
 
 예시:
 - "성함이 어떻게 되시나요?" (이름 수집)
 - "생년월일을 알려주시겠어요?" (생년월일 수집)
 - "현재 거주하시는 주소가 어떻게 되시나요?" (주소 수집)
+- 사용자가 거부하면: "서류 작성을 위해 꼭 필요한 정보입니다. 주소를 알려주시겠어요?"
 """),
     MessagesPlaceholder(variable_name="history"),
     ("human", "{user_input}")
@@ -427,6 +435,11 @@ async def process_form_conversation(
     current_doc = session["current_document"]
     unfilled = get_unfilled_fields(session_id, current_doc)
     
+    print(f"[TALK_TO_FILL] 현재 문서: {current_doc}")
+    print(f"[TALK_TO_FILL] 미작성 필드 수: {len(unfilled)}")
+    if unfilled:
+        print(f"[TALK_TO_FILL] 처음 5개 미작성 필드: {[f['field'] for f in unfilled[:5]]}")
+    
     # 사용자 응답에서 정보 추출
     if unfilled:
         target_fields_str = "\n".join([
@@ -437,6 +450,9 @@ async def process_form_conversation(
         extraction_chain = extraction_prompt | llm
         
         try:
+            print(f"[TALK_TO_FILL] 정보 추출 시작...")
+            print(f"[TALK_TO_FILL] 대상 필드들: {[f['field'] for f in unfilled[:5]]}")
+            
             extraction_response = extraction_chain.invoke({
                 "target_fields": target_fields_str,
                 "user_response": user_input
@@ -444,22 +460,34 @@ async def process_form_conversation(
             
             # 응답에서 JSON 추출
             response_text = extraction_response.content if hasattr(extraction_response, 'content') else str(extraction_response)
+            print(f"[TALK_TO_FILL] LLM 추출 응답: {response_text[:200]}")
             
             # JSON 부분만 추출
             json_match = re.search(r'\{[^{}]*\}', response_text)
             if json_match:
                 extracted = json.loads(json_match.group())
+                print(f"[TALK_TO_FILL] ✅ 추출 성공: {extracted}")
             else:
                 extracted = {}
+                print(f"[TALK_TO_FILL] ⚠️ JSON을 찾을 수 없음")
                 
         except Exception as e:
-            print(f"정보 추출 오류: {e}")
+            print(f"[TALK_TO_FILL] ❌ 정보 추출 오류: {e}")
             extracted = {}
         
         # 추출된 정보로 폼 업데이트
         for field_name, value in extracted.items():
             if value:
                 update_form_field(session_id, current_doc, field_name, value)
+        
+        # 사용자가 "필요없음", "해당없음" 등을 말하면 현재 질문한 필드들을 건너뛰기
+        skip_keywords = ["필요없", "해당없", "해당 없", "모르겠", "없어", "아니", "건너뛰", "스킵"]
+        if any(keyword in user_input for keyword in skip_keywords) and not extracted:
+            print(f"[TALK_TO_FILL] ⏭️ 사용자가 필드 스킵 요청")
+            # 현재 물어본 필드들(최대 5개)을 "N/A"로 채우기
+            for field_info in unfilled[:5]:
+                update_form_field(session_id, current_doc, field_info['field'], "N/A")
+                print(f"[TALK_TO_FILL]   - {field_info['field']} → N/A")
     else:
         extracted = {}
     
@@ -490,6 +518,11 @@ async def process_form_conversation(
     config = {"configurable": {"session_id": session_id}}
     
     try:
+        print(f"[TALK_TO_FILL] 응답 생성 시작...")
+        print(f"[TALK_TO_FILL]   - 카테고리: {session['category']}")
+        print(f"[TALK_TO_FILL]   - 현재 문서: {current_doc or '없음'}")
+        print(f"[TALK_TO_FILL]   - 미작성 필드 수: {len(unfilled) if unfilled else 0}")
+        
         response = form_chain.invoke(
             {
                 "category": session["category"],
@@ -501,16 +534,24 @@ async def process_form_conversation(
         )
         
         response_text = response.content if hasattr(response, 'content') else str(response)
+        print(f"[TALK_TO_FILL] ✅ 응답 생성 성공: {response_text[:150]}")
     except Exception as e:
-        print(f"응답 생성 오류: {e}")
+        print(f"[TALK_TO_FILL] ❌ 응답 생성 오류: {e}")
+        import traceback
+        traceback.print_exc()
         response_text = "죄송합니다. 일시적인 오류가 발생했습니다. 다시 말씀해주시겠어요?"
     
     # 완료 여부 확인
     all_unfilled = get_unfilled_fields(session_id)
     is_completed = len(all_unfilled) == 0
     
+    print(f"[TALK_TO_FILL] 완료 여부 체크:")
+    print(f"[TALK_TO_FILL]   - 전체 미작성 필드 수: {len(all_unfilled)}")
+    print(f"[TALK_TO_FILL]   - 완료: {is_completed}")
+    
     if is_completed:
         session["completed"] = True
+        print(f"[TALK_TO_FILL] 🎉 모든 서류 작성 완료!")
     
     return {
         "response": response_text[:300],
