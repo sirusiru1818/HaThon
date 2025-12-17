@@ -508,6 +508,37 @@
             margin-top: 4px;
         }
 
+        /* PDF 다운로드 버튼 */
+        .pdf-download-section {
+            margin-top: 15px;
+            padding: 15px;
+            background: #f0f7ff;
+            border-radius: 8px;
+        }
+
+        .pdf-download-btn {
+            display: inline-block;
+            padding: 10px 20px;
+            background: linear-gradient(135deg, #1976d2 0%, #1565c0 100%);
+            color: white;
+            text-decoration: none;
+            border-radius: 6px;
+            font-weight: 500;
+            transition: all 0.3s;
+            box-shadow: 0 2px 4px rgba(25, 118, 210, 0.2);
+        }
+
+        .pdf-download-btn:hover {
+            background: linear-gradient(135deg, #1565c0 0%, #0d47a1 100%);
+            box-shadow: 0 4px 8px rgba(25, 118, 210, 0.3);
+            transform: translateY(-2px);
+        }
+
+        .pdf-download-btn:active {
+            transform: translateY(0);
+            box-shadow: 0 2px 4px rgba(25, 118, 210, 0.2);
+        }
+
         /* 진행률 표시 */
         .progress-display {
             margin: 12px 0;
@@ -850,7 +881,9 @@
                     
                     // 완료 처리
                     if (data.completed) {
-                        addCompletionNotice();
+                        console.log('[프론트] 🎉 폼 작성 완료!');
+                        console.log('[프론트] 📄 PDF 파일:', data.pdf_files);
+                        addCompletionNotice(data.pdf_files);
                         currentMode = 'category';
                         formSessionId = null;
                         currentCategory = null;
@@ -990,18 +1023,42 @@
         }
 
         // 완료 알림 추가
-        function addCompletionNotice() {
+        function addCompletionNotice(pdfFiles = null) {
             const chatArea = document.getElementById('chatArea');
             const noticeDiv = document.createElement('div');
             noticeDiv.className = 'completion-notice';
+            
+            let pdfLinksHtml = '';
+            if (pdfFiles && pdfFiles.length > 0) {
+                pdfLinksHtml = `
+                    <div class="pdf-download-section">
+                        <div style="font-weight: bold; margin-bottom: 10px; color: #1976d2;">
+                            📄 생성된 서류
+                        </div>
+                        ${pdfFiles.map(pdf => `
+                            <div style="margin: 8px 0;">
+                                <a href="/pdf/download/${formSessionId}/${pdf.document_name}" 
+                                   download="${pdf.document_name}.pdf"
+                                   class="pdf-download-btn">
+                                    📥 ${pdf.document_name}.pdf 다운로드
+                                </a>
+                            </div>
+                        `).join('')}
+                    </div>
+                `;
+            }
+            
             noticeDiv.innerHTML = `
                 <div class="notice-content">
                     <div class="notice-icon">🎉</div>
                     <div class="notice-text">
                         <strong>서류 작성이 완료되었습니다!</strong>
                         <div class="notice-details">
-                            다른 서비스가 필요하시면 말씀해주세요.
+                            ${pdfFiles && pdfFiles.length > 0 ? 
+                              '아래 버튼을 클릭하여 서류를 다운로드하세요.' : 
+                              '다른 서비스가 필요하시면 말씀해주세요.'}
                         </div>
+                        ${pdfLinksHtml}
                     </div>
                 </div>
             `;

@@ -3,7 +3,7 @@ import os
 import sys
 from fastapi import FastAPI, UploadFile, File, HTTPException
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, FileResponse
 from pydantic import BaseModel, Field
 from enum import Enum
 from dotenv import load_dotenv
@@ -961,4 +961,67 @@ async def generate_pdf(request: PdfGenerateRequest):
         "generated_files": generated_files,
         "errors": errors if errors else None,
         "output_directory": output_dir
+    }
+
+
+@app.get("/pdf/download/{session_id}/{document_name}")
+async def download_pdf(session_id: str, document_name: str):
+    """
+    생성된 PDF 파일을 다운로드합니다.
+    
+    Args:
+        session_id: 폼 세션 ID
+        document_name: 문서명 (예: "위임장", "대리수령")
+        
+    Returns:
+        PDF 파일
+    """
+    project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    pdf_path = os.path.join(project_root, "output", session_id, f"{document_name}.pdf")
+    
+    if not os.path.exists(pdf_path):
+        raise HTTPException(status_code=404, detail=f"PDF 파일을 찾을 수 없습니다: {document_name}.pdf")
+    
+    return FileResponse(
+        path=pdf_path,
+        media_type="application/pdf",
+        filename=f"{document_name}.pdf"
+    )
+
+
+@app.get("/pdf/list/{session_id}")
+async def list_pdfs(session_id: str):
+    """
+    세션의 생성된 PDF 파일 목록을 반환합니다.
+    
+    Args:
+        session_id: 폼 세션 ID
+        
+    Returns:
+        PDF 파일 목록
+    """
+    project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    output_dir = os.path.join(project_root, "output", session_id)
+    
+    if not os.path.exists(output_dir):
+        return {
+            "session_id": session_id,
+            "pdf_files": [],
+            "message": "생성된 PDF가 없습니다."
+        }
+    
+    pdf_files = []
+    for filename in os.listdir(output_dir):
+        if filename.endswith('.pdf'):
+            doc_name = os.path.splitext(filename)[0]
+            pdf_files.append({
+                "document_name": doc_name,
+                "filename": filename,
+                "download_url": f"/pdf/download/{session_id}/{doc_name}"
+            })
+    
+    return {
+        "session_id": session_id,
+        "pdf_files": pdf_files,
+        "count": len(pdf_files)
     }
