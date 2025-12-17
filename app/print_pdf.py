@@ -14,6 +14,15 @@ from reportlab.lib.pagesizes import A4
 from reportlab.lib import colors
 from pypdf import PdfReader, PdfWriter
 
+# 카테고리와 폴더 매핑 (talk_to_fill.py와 동일)
+CATEGORY_FOLDER_MAP = {
+    "국민연금": "1_Welfare",
+    "전입신고": "2_Report", 
+    "토지-건축물": "3_Land",
+    "청년월세": "4_Monthly",
+    "주거급여": "5_Salary"
+}
+
 
 class PdfGenerator:
     """PDF 템플릿에 텍스트를 오버레이하여 새 PDF를 생성하는 클래스"""
@@ -135,70 +144,95 @@ class PdfManager:
     
     def __init__(self, base_dir):
         self.base_dir = base_dir
-        self.assets_dir = os.path.join(base_dir, 'assets')
+        self.docs_dir = os.path.join(base_dir, 'docs')
         
-        # [핵심] 문서 등록부 (Registry)
-        # 백엔드에서 보내주는 'doc_type' 키값과 실제 파일명을 연결합니다.
-        self.doc_registry = {
-            # "문서타입ID": { "template": "PDF파일명", "coords": "좌표JSON파일명" }
-            
-            # 청년 월세 위임장
-            "youth_rent_apply": { 
-                "template": "wiimjang.pdf", 
-                "coords": "wiimjang.json",
-                "invert_y": True
-            },
-            # 청년 월세 지원 신청서 (대리수령)
-            "appeal_request": { 
-                "template": "청년월세지원대리수령신청서.pdf", 
-                "coords": "청년월세지원대리수령신청서.json",
-                "invert_y": False
-            }
-            # 필요한 서류가 늘어나면 여기에 계속 추가하면 됩니다.
-        }
+        # 폰트 경로 (고정)
+        self.font_path = os.path.join(base_dir, 'assets', 'fonts', 'NanumGothic-Regular.ttf')
 
-    def process_request(self, doc_type, user_data, output_filename, debug=False):
+    def find_document_files(self, category_folder, document_name):
+        """
+        카테고리 폴더에서 문서명에 해당하는 파일들을 찾습니다.
+        
+        Args:
+            category_folder: "4_Monthly" 같은 카테고리 폴더명
+            document_name: "위임장", "대리수령" 같은 문서명
+            
+        Returns:
+            dict: {
+                "template": "템플릿 PDF 경로",
+                "coords": "좌표 JSON 경로",
+                "invert_y": True/False
+            }
+        """
+        category_path = os.path.join(self.docs_dir, category_folder)
+        
+        if not os.path.exists(category_path):
+            raise FileNotFoundError(f"카테고리 폴더가 없습니다: {category_path}")
+        
+        # 하위 폴더 탐색
+        for root, dirs, files in os.walk(category_path):
+            folder_name = os.path.basename(root)
+            
+            # 문서명과 일치하는 폴더 찾기
+            if folder_name == document_name:
+                template_path = None
+                coords_path = None
+                
+                for file in files:
+                    if file.endswith('.pdf') and '_좌표' not in file:
+                        template_path = os.path.join(root, file)
+                    elif file.endswith('_좌표.json'):
+                        coords_path = os.path.join(root, file)
+                
+                if template_path and coords_path:
+                    return {
+                        "template": template_path,
+                        "coords": coords_path,
+                        "invert_y": True  # 기본값
+                    }
+        
+        raise FileNotFoundError(f"'{document_name}' 문서의 템플릿 또는 좌표 파일을 찾을 수 없습니다.")
+    
+    def process_request(self, category_folder, document_name, user_data, output_filename, debug=False):
         """
         문서 타입에 맞는 PDF를 생성합니다.
         
         Args:
-            doc_type: "youth_rent_apply" 같은 문서 식별자
-            user_data: 채울 데이터 { "name": "홍길동"... }
+            category_folder: "4_Monthly" 같은 카테고리 폴더명
+            document_name: "위임장", "대리수령" 같은 문서명
+            user_data: 채울 데이터 { "delegator.name": "홍길동"... }
             output_filename: 저장할 파일명 (전체 경로)
             debug: 디버그 모드 (빨간 박스 표시)
             
         Returns:
             생성된 PDF 파일 경로
         """
+        print(f"[PDF_MANAGER] PDF 생성 시작")
+        print(f"[PDF_MANAGER]   - 카테고리: {category_folder}")
+        print(f"[PDF_MANAGER]   - 문서명: {document_name}")
         
-        # 1. 등록된 문서인지 확인
-        if doc_type not in self.doc_registry:
-            raise ValueError(f"지원하지 않는 문서 타입입니다: {doc_type}")
-
-        # 2. 파일 경로 설정
-        doc_info = self.doc_registry[doc_type]
+        # 1. 문서 파일 찾기
+        doc_info = self.find_document_files(category_folder, document_name)
+        print(f"[PDF_MANAGER]   - 템플릿: {doc_info['template']}")
+        print(f"[PDF_MANAGER]   - 좌표: {doc_info['coords']}")
         
-        template_path = os.path.join(self.assets_dir, 'templates', doc_info['template'])
-        coords_path = os.path.join(self.assets_dir, 'coords', doc_info['coords'])
-
-        # 설정값 가져오기
-        invert_option = doc_info.get('invert_y', True)
-        
-        # 3. 좌표 파일 로딩
-        if not os.path.exists(coords_path):
-            raise FileNotFoundError(f"좌표 파일이 없습니다: {coords_path}")
-            
-        with open(coords_path, 'r', encoding='utf-8') as f:
+        # 2. 좌표 파일 로딩
+        with open(doc_info['coords'], 'r', encoding='utf-8') as f:
             coords_data = json.load(f)
-
-        # 4. Generator 호출 (기존에 만든 클래스 사용)
-        # 폰트 경로는 공통이므로 여기서 지정
-        font_path = os.path.join(self.assets_dir, 'fonts', 'NanumGothic-Regular.ttf')
+        print(f"[PDF_MANAGER]   - 좌표 필드 수: {len(coords_data)}")
         
-        generator = PdfGenerator(template_path, font_path)
+        # 3. Generator 초기화 및 PDF 생성
+        generator = PdfGenerator(doc_info['template'], self.font_path)
         
-        # 5. PDF 생성
-        result_path = generator.create_pdf(user_data, coords_data, output_filename, debug, invert_y=invert_option)
+        result_path = generator.create_pdf(
+            user_data, 
+            coords_data, 
+            output_filename, 
+            debug, 
+            invert_y=doc_info['invert_y']
+        )
+        
+        print(f"[PDF_MANAGER] ✅ PDF 생성 완료: {result_path}")
         return result_path
 
 
@@ -214,11 +248,13 @@ def main():
     # Manager 초기화
     manager = PdfManager(project_root)
     output_dir = os.path.join(project_root, 'output')
+    os.makedirs(output_dir, exist_ok=True)
 
     # --- 시나리오 1: 청년 월세 위임장 ---
     print("\n[Case 1] 사용자가 '청년월세 위임장'을 원함")
     
-    req_type_1 = "youth_rent_apply"
+    category_1 = "4_Monthly"
+    doc_name_1 = "위임장"
     data_1 = {
         # 위임하는 사람
         "delegator.name": "홍길동",
@@ -242,63 +278,62 @@ def main():
     try:
         filename = os.path.join(output_dir, "result_위임장.pdf")
         # debug=True 로 설정하면 빨간 박스가 보입니다.
-        manager.process_request(req_type_1, data_1, filename, debug=True)
+        manager.process_request(category_1, doc_name_1, data_1, filename, debug=True)
         print(f" -> ✅ 성공: {filename}")
     except Exception as e:
         print(f" -> ❌ 실패: {e}")
+        import traceback
+        traceback.print_exc()
 
 
     # --- 시나리오 2: 대리수령 신청서 ---
     print("\n[Case 2] 사용자가 '대리수령 신청서'를 원함")
     
-    req_type_2 = "appeal_request"
+    category_2 = "4_Monthly"
+    doc_name_2 = "대리수령"
     data_2 = {
         "recipient.name": "홍길동",
-        "recipient.birthdate": "1958-03-12",
+        "recipient.birthdate": "1950-01-01",
         "recipient.gender": "남",
-
-        "recipient.phone": "02-345-6789",
+        "recipient.number": "02-123-4567",
         "recipient.mobile": "010-1234-5678",
-        "recipient.address": "서울특별시 강남구 테헤란로 123",
+        "recipient.address": "서울시 강남구 테헤란로 123, 101동 101호",
 
-        "application_reason.guardianship_no_account": "해당",
+        "application_reason.guardianship_no_account": "",
         "application_reason.seized_claim": "",
-        "application_reason.dementia_or_immobility": "",
+        "application_reason.dementia_or_immobility": "V",
 
         "receive_period.start_year": "2024",
         "receive_period.start_month": "01",
         "receive_period.end_year": "2024",
-        "receive_period.end_month": "12",
-        "receive_period.total_months": "12",
+        "receive_period.end_month": "02",
+        "receive_period.total_months": "1",
 
-        "guardian.name": "김철수",
-        "guardian.birthdate": "1985-07-21",
-        "guardian.phone": "02-987-6543",
-        "guardian.mobile": "010-9876-5432",
-        "guardian.address": "서울특별시 서초구 서초대로 45",
+        "guardian.name": "",
+        "guardian.birthdate": "",
+        "guardian.number": "",
+        "guardian.mobile": "",
+        "guardian.address": "",
 
-        "proxy_receiver.name": "이영희",
-        "proxy_receiver.birthdate": "1990-11-05",
-        "proxy_receiver.phone": "031-222-3333",
-        "proxy_receiver.mobile": "010-2222-3333",
-        "proxy_receiver.address": "경기도 성남시 분당구 판교로 88",
-        "proxy_receiver.relationship_to_recipient": "자녀",
+        "representative_recipient.name": "홍길순",
+        "representative_recipient.birthdate": "1980-05-05",
+        "representative_recipient.phone": "02-987-6543",
+        "representative_recipient.number": "010-9876-5432",
+        "representative_recipient.address": "경기도 성남시 분당구 판교로 456",
+        "representative_recipient.relationship_to_recipient": "자녀",
 
-        "bank_account.bank_name": "국민은행",
-        "bank_account.account_number": "123456-01-987654",
-
-        "signature.date.year": "2024",
-        "signature.date.month": "09",
-        "signature.date.day": "30",
-        "signature.name": "홍길동"
+        "bank_account.bank_name": "KB국민은행",
+        "bank_account.account_number": "123-456-78-901234"
     }
     
     try:
         filename = os.path.join(output_dir, "result_대리수령.pdf")
-        manager.process_request(req_type_2, data_2, filename, debug=True)
+        manager.process_request(category_2, doc_name_2, data_2, filename, debug=True)
         print(f" -> ✅ 성공: {filename}")
     except Exception as e:
         print(f" -> ❌ 실패: {e}")
+        import traceback
+        traceback.print_exc()
 
 
 if __name__ == "__main__":

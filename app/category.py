@@ -25,6 +25,9 @@ voice_path = os.path.join(os.path.dirname(__file__), "voice")
 if voice_path not in sys.path:
     sys.path.insert(0, voice_path)
 
+# PDF 생성 모듈 import
+from .print_pdf import PdfManager, CATEGORY_FOLDER_MAP as PDF_CATEGORY_MAP
+
 # 필수 환경 변수 확인
 required_env_vars = ["AWS_MODEL_ID", "AWS_REGION", "AWS_ACCESS_KEY_ID", "AWS_SECRET_ACCESS_KEY"]
 missing_vars = [var for var in required_env_vars if not os.getenv(var)]
@@ -610,13 +613,92 @@ async def voice_process(request: VoiceTextRequest):
             }
         )
         
-        return {
+        # 폼 작성이 완료되면 자동으로 PDF 생성
+        pdf_files = None
+        if form_result.get("completed"):
+            print(f"[PDF AUTO] 폼 작성 완료 감지 - PDF 자동 생성 시작")
+            add_log(
+                "pdf_generation_started",
+                current_mode="form",
+                form_session_id=request.form_session_id,
+                category=request.category
+            )
+            
+            try:
+                from .talk_to_fill import get_filled_form
+                
+                # 완성된 폼 데이터 가져오기
+                filled_data = get_filled_form(request.form_session_id)
+                
+                if filled_data:
+                    category_folder = PDF_CATEGORY_MAP.get(request.category)
+                    
+                    if category_folder:
+                        # PDF Manager 초기화
+                        project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+                        pdf_manager = PdfManager(project_root)
+                        
+                        # 출력 디렉토리 설정
+                        output_dir = os.path.join(project_root, "output", request.form_session_id)
+                        os.makedirs(output_dir, exist_ok=True)
+                        
+                        # 모든 문서에 대해 PDF 생성
+                        pdf_files = []
+                        for doc_name, doc_data in filled_data["documents"].items():
+                            try:
+                                output_path = os.path.join(output_dir, f"{doc_name}.pdf")
+                                result_path = pdf_manager.process_request(
+                                    category_folder=category_folder,
+                                    document_name=doc_name,
+                                    user_data=doc_data,
+                                    output_filename=output_path,
+                                    debug=False
+                                )
+                                pdf_files.append({
+                                    "document_name": doc_name,
+                                    "file_path": result_path
+                                })
+                                print(f"[PDF AUTO] ✅ '{doc_name}' PDF 생성 완료: {result_path}")
+                            except Exception as e:
+                                print(f"[PDF AUTO] ❌ '{doc_name}' PDF 생성 실패: {e}")
+                        
+                        add_log(
+                            "pdf_generation_completed",
+                            current_mode="form",
+                            form_session_id=request.form_session_id,
+                            category=request.category,
+                            details={"pdf_files": pdf_files}
+                        )
+                    else:
+                        print(f"[PDF AUTO] ⚠️ 카테고리 '{request.category}'에 대한 폴더 매핑이 없습니다.")
+                else:
+                    print(f"[PDF AUTO] ⚠️ 폼 데이터를 가져올 수 없습니다.")
+                    
+            except Exception as e:
+                print(f"[PDF AUTO] ❌ PDF 자동 생성 오류: {e}")
+                import traceback
+                traceback.print_exc()
+                add_log(
+                    "pdf_generation_error",
+                    current_mode="form",
+                    form_session_id=request.form_session_id,
+                    category=request.category,
+                    details={"error": str(e)}
+                )
+        
+        response_data = {
             "transcribed_text": transcribed_text,
             "mode": "form",
             "form_session_id": request.form_session_id,
             "category": request.category,
             **form_result
         }
+        
+        # PDF 파일 정보 추가
+        if pdf_files:
+            response_data["pdf_files"] = pdf_files
+        
+        return response_data
     else:
         # 카테고리 분류 모드 (기본)
         add_log(
@@ -784,3 +866,99 @@ async def get_frontend():
         </body>
     </html>
     """
+
+
+# ============================================
+# PDF 생성 엔드포인트
+# ============================================
+
+class PdfGenerateRequest(BaseModel):
+    """PDF 생성 요청 모델"""
+    session_id: str = Field(description="폼 세션 ID")
+    document_name: Optional[str] = Field(default=None, description="특정 문서만 생성 (None이면 전체)")
+    debug: bool = Field(default=False, description="디버그 모드 (빨간 박스 표시)")
+
+
+@app.post("/pdf/generate")
+async def generate_pdf(request: PdfGenerateRequest):
+    """
+    완성된 폼 데이터로 PDF를 생성합니다.
+    
+    Args:
+        session_id: 폼 세션 ID
+        document_name: 특정 문서만 생성 (None이면 전체 문서 생성)
+        debug: 디버그 모드
+        
+    Returns:
+        생성된 PDF 파일 경로 목록
+    """
+    from .talk_to_fill import get_form_session, get_filled_form
+    
+    # 세션 확인
+    session = get_form_session(request.session_id)
+    if not session:
+        raise HTTPException(status_code=404, detail="세션을 찾을 수 없습니다.")
+    
+    # 완성된 폼 데이터 가져오기
+    filled_data = get_filled_form(request.session_id)
+    if not filled_data:
+        raise HTTPException(status_code=404, detail="폼 데이터를 찾을 수 없습니다.")
+    
+    category = filled_data["category"]
+    category_folder = PDF_CATEGORY_MAP.get(category)
+    
+    if not category_folder:
+        raise HTTPException(status_code=400, detail=f"'{category}' 카테고리에 대한 폴더 매핑이 없습니다.")
+    
+    # PDF Manager 초기화
+    project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    pdf_manager = PdfManager(project_root)
+    
+    # 출력 디렉토리 설정
+    output_dir = os.path.join(project_root, "output", request.session_id)
+    os.makedirs(output_dir, exist_ok=True)
+    
+    # PDF 생성
+    generated_files = []
+    errors = []
+    
+    documents_to_process = {}
+    if request.document_name:
+        # 특정 문서만
+        if request.document_name in filled_data["documents"]:
+            documents_to_process[request.document_name] = filled_data["documents"][request.document_name]
+    else:
+        # 전체 문서
+        documents_to_process = filled_data["documents"]
+    
+    for doc_name, doc_data in documents_to_process.items():
+        try:
+            output_path = os.path.join(output_dir, f"{doc_name}.pdf")
+            
+            result_path = pdf_manager.process_request(
+                category_folder=category_folder,
+                document_name=doc_name,
+                user_data=doc_data,
+                output_filename=output_path,
+                debug=request.debug
+            )
+            
+            generated_files.append({
+                "document_name": doc_name,
+                "file_path": result_path,
+                "success": True
+            })
+            
+        except Exception as e:
+            errors.append({
+                "document_name": doc_name,
+                "error": str(e)
+            })
+    
+    return {
+        "session_id": request.session_id,
+        "category": category,
+        "generated_files": generated_files,
+        "errors": errors if errors else None,
+        "output_directory": output_dir
+    }

@@ -110,6 +110,9 @@ uvicorn main:app --reload
 
 테스트 파일은 `tests/` 폴더의 Jupyter 노트북을 참고하세요.
 
-
+## 웹
+http://127.0.0.1:8000
+http://localhost:8000/docs#/
+http://127.0.0.1:8000/online
 
 
