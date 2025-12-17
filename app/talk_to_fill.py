@@ -64,7 +64,13 @@ def parse_json_with_comments(content: str) -> Dict[str, Any]:
             else:
                 result.append(char)
             i += 1
-        cleaned_lines.append(''.join(result))
+        
+        # 주석 제거 후 trailing 공백/탭 제거
+        cleaned_line = ''.join(result).rstrip()
+        
+        # 주석 전용 줄이거나 빈 줄이 아니면 추가
+        if cleaned_line and not cleaned_line.strip().startswith('//'):
+            cleaned_lines.append(cleaned_line)
     
     cleaned_content = '\n'.join(cleaned_lines)
     
@@ -72,10 +78,13 @@ def parse_json_with_comments(content: str) -> Dict[str, Any]:
     cleaned_content = re.sub(r',(\s*[}\]])', r'\1', cleaned_content)
     
     try:
-        return json.loads(cleaned_content)
+        parsed = json.loads(cleaned_content)
+        print(f"[DEBUG] ✅ JSON 파싱 성공: {len(parsed)} 개 필드")
+        return parsed
     except json.JSONDecodeError as e:
         # 파싱 실패 시 빈 딕셔너리 반환
-        print(f"JSON 파싱 오류: {e}")
+        print(f"[DEBUG] ❌ JSON 파싱 오류: {e}")
+        print(f"[DEBUG] 파싱 시도한 내용 (처음 500자):\n{cleaned_content[:500]}")
         return {}
 
 
@@ -145,23 +154,35 @@ def load_category_documents_with_descriptions(category: str) -> Dict[str, Dict[s
         }
     """
     folder_name = CATEGORY_FOLDER_MAP.get(category)
+    print(f"[DEBUG] 카테고리: {category} → 폴더: {folder_name}")
+    
     if not folder_name:
+        print(f"[DEBUG] 카테고리 '{category}'에 매핑된 폴더가 없습니다.")
         return {}
     
     folder_path = os.path.join(DOCS_BASE_PATH, folder_name)
+    print(f"[DEBUG] 폴더 경로: {folder_path}")
+    print(f"[DEBUG] 폴더 존재 여부: {os.path.exists(folder_path)}")
     
     if not os.path.exists(folder_path):
+        print(f"[DEBUG] 폴더가 존재하지 않습니다: {folder_path}")
         return {}
     
     documents = {}
     
-    for filename in os.listdir(folder_path):
+    files = os.listdir(folder_path)
+    print(f"[DEBUG] 폴더 내 파일 목록: {files}")
+    
+    for filename in files:
         if filename.endswith('.txt') or filename.endswith('.json'):
             file_path = os.path.join(folder_path, filename)
+            print(f"[DEBUG] 파일 처리 중: {filename}")
             try:
                 with open(file_path, 'r', encoding='utf-8') as f:
                     content = f.read()
+                    print(f"[DEBUG] 파일 내용 길이: {len(content)}")
                     parsed = parse_json_with_comments(content)
+                    print(f"[DEBUG] 파싱 결과: {len(parsed)} 필드")
                     descriptions = extract_field_descriptions(content)
                     
                     if parsed:
@@ -170,8 +191,16 @@ def load_category_documents_with_descriptions(category: str) -> Dict[str, Dict[s
                             "fields": parsed,
                             "descriptions": descriptions
                         }
+                        print(f"[DEBUG] ✅ '{doc_name}' 문서 로드 성공")
+                    else:
+                        print(f"[DEBUG] ❌ '{filename}' 파싱 결과가 비어있습니다.")
             except Exception as e:
-                print(f"파일 로드 오류 ({filename}): {e}")
+                print(f"[DEBUG] ❌ 파일 로드 오류 ({filename}): {e}")
+                import traceback
+                traceback.print_exc()
+    
+    print(f"[DEBUG] 최종 로드된 문서 수: {len(documents)}")
+    print(f"[DEBUG] 문서 이름들: {list(documents.keys())}")
     
     return documents
 

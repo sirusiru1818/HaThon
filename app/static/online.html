@@ -1,0 +1,467 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🔍 LLM 흐름 모니터링</title>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=IBM+Plex+Sans+KR:wght@400;500;600&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg: #0a0a0f;
+            --bg-card: #12121a;
+            --bg-hover: #1a1a24;
+            --border: #2a2a3a;
+            --text: #e4e4e7;
+            --text-muted: #71717a;
+            --accent: #22d3ee;
+            --success: #22c55e;
+            --warning: #f59e0b;
+            --error: #ef4444;
+            --purple: #a78bfa;
+            --pink: #f472b6;
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: 'IBM Plex Sans KR', sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            min-height: 100vh;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #1e1e2e 0%, #12121a 100%);
+            border-bottom: 1px solid var(--border);
+            padding: 20px 24px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+
+        .header h1 {
+            font-size: 1.4rem;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .header-controls {
+            display: flex;
+            gap: 12px;
+            align-items: center;
+        }
+
+        .status-badge {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 14px;
+            background: rgba(34, 197, 94, 0.15);
+            border: 1px solid rgba(34, 197, 94, 0.3);
+            border-radius: 20px;
+            font-size: 0.85rem;
+            color: var(--success);
+        }
+
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            background: var(--success);
+            border-radius: 50%;
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        .btn {
+            padding: 8px 16px;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            background: var(--bg-card);
+            color: var(--text);
+            font-size: 0.85rem;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .btn:hover {
+            background: var(--bg-hover);
+            border-color: var(--accent);
+        }
+
+        .btn-danger {
+            border-color: var(--error);
+            color: var(--error);
+        }
+
+        .btn-danger:hover {
+            background: rgba(239, 68, 68, 0.15);
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 24px;
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 16px;
+            margin-bottom: 24px;
+        }
+
+        .stat-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 20px;
+        }
+
+        .stat-label {
+            font-size: 0.8rem;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 8px;
+        }
+
+        .stat-value {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 1.8rem;
+            font-weight: 600;
+        }
+
+        .stat-value.category { color: var(--accent); }
+        .stat-value.form { color: var(--success); }
+        .stat-value.error { color: var(--error); }
+
+        .logs-section {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            overflow: hidden;
+        }
+
+        .logs-header {
+            padding: 16px 20px;
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .logs-header h2 {
+            font-size: 1rem;
+            font-weight: 600;
+        }
+
+        .logs-container {
+            max-height: 600px;
+            overflow-y: auto;
+        }
+
+        .log-entry {
+            padding: 16px 20px;
+            border-bottom: 1px solid var(--border);
+            display: grid;
+            grid-template-columns: 140px 160px 1fr;
+            gap: 16px;
+            font-size: 0.9rem;
+            transition: background 0.2s;
+        }
+
+        .log-entry:hover {
+            background: var(--bg-hover);
+        }
+
+        .log-entry:last-child {
+            border-bottom: none;
+        }
+
+        .log-time {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.8rem;
+            color: var(--text-muted);
+        }
+
+        .log-event {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .event-badge {
+            padding: 4px 10px;
+            border-radius: 6px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            text-transform: uppercase;
+        }
+
+        .event-badge.request { background: rgba(34, 211, 238, 0.15); color: var(--accent); }
+        .event-badge.category { background: rgba(167, 139, 250, 0.15); color: var(--purple); }
+        .event-badge.form { background: rgba(34, 197, 94, 0.15); color: var(--success); }
+        .event-badge.mode-change { background: rgba(244, 114, 182, 0.15); color: var(--pink); }
+        .event-badge.error { background: rgba(239, 68, 68, 0.15); color: var(--error); }
+
+        .mode-indicator {
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-size: 0.7rem;
+            font-weight: 600;
+        }
+
+        .mode-indicator.category { background: var(--purple); color: white; }
+        .mode-indicator.form { background: var(--success); color: white; }
+
+        .log-content {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+
+        .log-text {
+            color: var(--text);
+        }
+
+        .log-category {
+            display: inline-block;
+            padding: 2px 8px;
+            background: rgba(245, 158, 11, 0.15);
+            color: var(--warning);
+            border-radius: 4px;
+            font-size: 0.8rem;
+            font-weight: 500;
+        }
+
+        .log-details {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            background: rgba(0,0,0,0.3);
+            padding: 8px 12px;
+            border-radius: 6px;
+            margin-top: 4px;
+            white-space: pre-wrap;
+            word-break: break-all;
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 60px 20px;
+            color: var(--text-muted);
+        }
+
+        .empty-state svg {
+            width: 48px;
+            height: 48px;
+            margin-bottom: 16px;
+            opacity: 0.5;
+        }
+
+        /* 스크롤바 */
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-track { background: var(--bg); }
+        ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #3a3a4a; }
+
+        /* 애니메이션 */
+        .log-entry.new {
+            animation: highlight 1s ease-out;
+        }
+
+        @keyframes highlight {
+            from { background: rgba(34, 211, 238, 0.2); }
+            to { background: transparent; }
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>🔍 LLM 흐름 모니터링</h1>
+        <div class="header-controls">
+            <div class="status-badge">
+                <span class="status-dot"></span>
+                <span id="connectionStatus">실시간 모니터링 중</span>
+            </div>
+            <button class="btn" onclick="toggleAutoRefresh()">
+                <span id="autoRefreshBtn">⏸️ 일시정지</span>
+            </button>
+            <button class="btn btn-danger" onclick="clearLogs()">🗑️ 로그 초기화</button>
+        </div>
+    </div>
+
+    <div class="container">
+        <div class="stats-grid">
+            <div class="stat-card">
+                <div class="stat-label">총 요청</div>
+                <div class="stat-value" id="totalRequests">0</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">카테고리 분류</div>
+                <div class="stat-value category" id="categoryCount">0</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">폼 작성</div>
+                <div class="stat-value form" id="formCount">0</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">모드 전환</div>
+                <div class="stat-value" id="modeChangeCount" style="color: var(--pink);">0</div>
+            </div>
+        </div>
+
+        <div class="logs-section">
+            <div class="logs-header">
+                <h2>📋 실시간 로그</h2>
+                <span id="logCount" style="color: var(--text-muted); font-size: 0.85rem;">0개</span>
+            </div>
+            <div class="logs-container" id="logsContainer">
+                <div class="empty-state">
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                    </svg>
+                    <p>아직 로그가 없습니다.<br>키오스크에서 대화를 시작해보세요.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let autoRefresh = true;
+        let lastLogCount = 0;
+        let refreshInterval;
+
+        function getEventBadgeClass(eventType) {
+            if (eventType.includes('request')) return 'request';
+            if (eventType.includes('category')) return 'category';
+            if (eventType.includes('form')) return 'form';
+            if (eventType.includes('mode_change')) return 'mode-change';
+            if (eventType.includes('error')) return 'error';
+            return 'request';
+        }
+
+        function formatEventType(eventType) {
+            const map = {
+                'request_received': '요청 수신',
+                'category_mode_processing': '카테고리 처리',
+                'category_classified': '카테고리 분류',
+                'mode_change_to_form': '모드 전환',
+                'form_session_started': '폼 세션 시작',
+                'form_mode_processing': '폼 처리',
+                'form_response': '폼 응답',
+                'staying_in_category_mode': '카테고리 유지',
+                'form_session_failed': '폼 생성 실패',
+                'error': '오류'
+            };
+            return map[eventType] || eventType;
+        }
+
+        function renderLogs(logs) {
+            const container = document.getElementById('logsContainer');
+            
+            if (logs.length === 0) {
+                container.innerHTML = `
+                    <div class="empty-state">
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                        </svg>
+                        <p>아직 로그가 없습니다.<br>키오스크에서 대화를 시작해보세요.</p>
+                    </div>
+                `;
+                return;
+            }
+
+            // 최신순으로 정렬
+            const sortedLogs = [...logs].reverse();
+            const isNew = logs.length > lastLogCount;
+            
+            container.innerHTML = sortedLogs.map((log, idx) => `
+                <div class="log-entry ${isNew && idx === 0 ? 'new' : ''}">
+                    <div class="log-time">${log.timestamp}</div>
+                    <div class="log-event">
+                        <span class="event-badge ${getEventBadgeClass(log.event_type)}">${formatEventType(log.event_type)}</span>
+                        <span class="mode-indicator ${log.current_mode === 'form' ? 'form' : 'category'}">${log.current_mode}</span>
+                    </div>
+                    <div class="log-content">
+                        ${log.input_text ? `<div class="log-text">📝 "${log.input_text}"</div>` : ''}
+                        ${log.category ? `<span class="log-category">${log.category}</span>` : ''}
+                        ${log.response ? `<div class="log-text" style="color: var(--text-muted);">💬 ${log.response}</div>` : ''}
+                        ${log.details ? `<div class="log-details">${JSON.stringify(log.details, null, 2)}</div>` : ''}
+                    </div>
+                </div>
+            `).join('');
+
+            lastLogCount = logs.length;
+        }
+
+        function updateStats(logs) {
+            const total = logs.filter(l => l.event_type === 'request_received').length;
+            const category = logs.filter(l => l.event_type === 'category_classified').length;
+            const form = logs.filter(l => l.event_type.includes('form_response')).length;
+            const modeChange = logs.filter(l => l.event_type === 'mode_change_to_form').length;
+
+            document.getElementById('totalRequests').textContent = total;
+            document.getElementById('categoryCount').textContent = category;
+            document.getElementById('formCount').textContent = form;
+            document.getElementById('modeChangeCount').textContent = modeChange;
+            document.getElementById('logCount').textContent = `${logs.length}개`;
+        }
+
+        async function fetchLogs() {
+            try {
+                const response = await fetch('/api/logs?limit=100');
+                const data = await response.json();
+                renderLogs(data.logs);
+                updateStats(data.logs);
+            } catch (error) {
+                console.error('로그 조회 실패:', error);
+            }
+        }
+
+        async function clearLogs() {
+            if (!confirm('모든 로그를 삭제하시겠습니까?')) return;
+            try {
+                await fetch('/api/logs/clear');
+                fetchLogs();
+            } catch (error) {
+                console.error('로그 초기화 실패:', error);
+            }
+        }
+
+        function toggleAutoRefresh() {
+            autoRefresh = !autoRefresh;
+            document.getElementById('autoRefreshBtn').textContent = autoRefresh ? '⏸️ 일시정지' : '▶️ 재개';
+            document.getElementById('connectionStatus').textContent = autoRefresh ? '실시간 모니터링 중' : '일시정지됨';
+            
+            if (autoRefresh) {
+                startRefresh();
+            } else {
+                stopRefresh();
+            }
+        }
+
+        function startRefresh() {
+            refreshInterval = setInterval(fetchLogs, 1000);
+        }
+
+        function stopRefresh() {
+            clearInterval(refreshInterval);
+        }
+
+        // 초기 로드
+        fetchLogs();
+        startRefresh();
+    </script>
+</body>
+</html>
+

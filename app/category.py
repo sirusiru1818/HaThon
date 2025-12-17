@@ -1,9 +1,15 @@
 # category.py
 import os
-from fastapi import FastAPI
+import sys
+from fastapi import FastAPI, UploadFile, File, HTTPException
+from fastapi.staticfiles import StaticFiles
+from fastapi.responses import HTMLResponse
 from pydantic import BaseModel, Field
 from enum import Enum
 from dotenv import load_dotenv
+from typing import Optional, List
+from datetime import datetime
+import json
 
 from langchain_aws import ChatBedrockConverse  # 새로 추가
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
@@ -13,6 +19,11 @@ import uuid
 
 # .env 파일에서 환경 변수 로드
 load_dotenv()
+
+# voice 모듈 경로 추가
+voice_path = os.path.join(os.path.dirname(__file__), "voice")
+if voice_path not in sys.path:
+    sys.path.insert(0, voice_path)
 
 # 필수 환경 변수 확인
 required_env_vars = ["AWS_MODEL_ID", "AWS_REGION", "AWS_ACCESS_KEY_ID", "AWS_SECRET_ACCESS_KEY"]
@@ -29,6 +40,53 @@ if missing_vars:
     )
 
 app = FastAPI()
+
+# ============================================
+# 실시간 로그 시스템
+# ============================================
+class LogEntry(BaseModel):
+    timestamp: str
+    event_type: str  # 'category_request', 'category_result', 'form_start', 'form_chat', 'mode_change', 'error'
+    session_id: Optional[str] = None
+    form_session_id: Optional[str] = None
+    current_mode: str = "category"
+    input_text: Optional[str] = None
+    category: Optional[str] = None
+    response: Optional[str] = None
+    details: Optional[dict] = None
+
+# 로그 저장소 (최근 100개만 유지)
+log_entries: List[LogEntry] = []
+MAX_LOG_ENTRIES = 100
+
+def add_log(event_type: str, **kwargs):
+    """로그 추가"""
+    entry = LogEntry(
+        timestamp=datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f")[:-3],
+        event_type=event_type,
+        **kwargs
+    )
+    log_entries.append(entry)
+    # 최대 개수 초과 시 오래된 것 삭제
+    if len(log_entries) > MAX_LOG_ENTRIES:
+        log_entries.pop(0)
+    print(f"[LOG] {entry.timestamp} | {event_type} | mode={entry.current_mode} | cat={entry.category}")
+
+# Static 파일 서빙 설정
+static_path = os.path.join(os.path.dirname(__file__), "static")
+if os.path.exists(static_path):
+    app.mount("/static", StaticFiles(directory=static_path), name="static")
+
+# talk_to_fill 모듈 import
+from .talk_to_fill import (
+    process_form_conversation,
+    get_filled_form,
+    close_form_session,
+    init_form_session,
+    get_form_session,
+    FormConversationRequest,
+    CATEGORY_FOLDER_MAP
+)
 
 # 1) LLM 전역 초기화 (앱 시작할 때 한 번만)
 llm = ChatBedrockConverse(
@@ -164,7 +222,7 @@ etc_guidance_chain_with_history = RunnableWithMessageHistory(
 # STT 모듈이 나중에 보내줄 데이터 형식
 class UserInquiry(BaseModel):
     text: str  # STT 모듈에서 변환된 사용자 질문 텍스트
-    session_id: str | None = Field(default=None, description="세션 ID (etc 카테고리일 때 대화 유도를 위해 사용)")
+    session_id: Optional[str] = Field(default=None, description="세션 ID (etc 카테고리일 때 대화 유도를 위해 사용)")
 
 @app.post("/process")
 async def process_inquiry(input_data: UserInquiry):
@@ -276,6 +334,443 @@ async def process_inquiry(input_data: UserInquiry):
             "answer": answer,
             "message": "질문이 정상적으로 처리되었습니다.",
             "reason": "오류 발생으로 etc 카테고리로 분류되었습니다.",
-            "session_id": session_id,
+            "session_id": input_data.session_id,
             "error": str(e)
         }
+
+
+# ============================================
+# 폼 작성 대화 관련 엔드포인트
+# ============================================
+
+@app.post("/form/start")
+async def start_form_session(category: str, session_id: str = None):
+    """
+    폼 작성 세션을 시작합니다.
+    카테고리에 해당하는 문서들을 로드하고 세션을 초기화합니다.
+    """
+    if category not in CATEGORY_FOLDER_MAP:
+        return {
+            "error": f"지원하지 않는 카테고리입니다: {category}",
+            "available_categories": list(CATEGORY_FOLDER_MAP.keys())
+        }
+    
+    # 세션 ID가 없으면 새로 생성
+    if not session_id:
+        session_id = str(uuid.uuid4())
+    
+    # 세션 초기화
+    form_state = init_form_session(session_id, category)
+    
+    if not form_state["documents"]:
+        return {
+            "error": f"카테고리 '{category}'에 해당하는 문서가 없습니다.",
+            "session_id": session_id
+        }
+    
+    return {
+        "message": f"{category} 관련 서류 작성을 시작합니다.",
+        "session_id": session_id,
+        "category": category,
+        "documents": list(form_state["documents"].keys()),
+        "current_document": form_state["current_document"],
+        "total_fields": sum(doc["total_count"] for doc in form_state["documents"].values())
+    }
+
+
+@app.post("/form/chat")
+async def form_chat(request: FormConversationRequest):
+    """
+    폼 작성 대화를 처리합니다.
+    사용자 입력에서 정보를 추출하고 다음 질문을 생성합니다.
+    """
+    result = await process_form_conversation(
+        session_id=request.session_id,
+        user_input=request.user_input,
+        category=request.category
+    )
+    
+    return result
+
+
+@app.get("/form/status/{session_id}")
+async def get_form_status(session_id: str):
+    """
+    현재 폼 작성 상태를 조회합니다.
+    """
+    session = get_form_session(session_id)
+    
+    if not session:
+        return {"error": "세션을 찾을 수 없습니다."}
+    
+    return {
+        "session_id": session_id,
+        "category": session["category"],
+        "current_document": session["current_document"],
+        "completed": session["completed"],
+        "documents": {
+            doc_name: {
+                "filled_count": doc["filled_count"],
+                "total_count": doc["total_count"],
+                "progress": f"{doc['filled_count']}/{doc['total_count']}"
+            }
+            for doc_name, doc in session["documents"].items()
+        }
+    }
+
+
+@app.get("/form/result/{session_id}")
+async def get_form_result(session_id: str):
+    """
+    완성된 폼 데이터를 조회합니다.
+    """
+    result = get_filled_form(session_id)
+    
+    if not result:
+        return {"error": "세션을 찾을 수 없습니다."}
+    
+    return result
+
+
+@app.delete("/form/session/{session_id}")
+async def delete_form_session(session_id: str):
+    """
+    폼 세션을 종료하고 삭제합니다.
+    """
+    result = close_form_session(session_id)
+    
+    if not result:
+        return {"error": "세션을 찾을 수 없습니다."}
+    
+    return {
+        "message": "세션이 종료되었습니다.",
+        "final_data": get_filled_form(session_id)
+    }
+
+
+@app.get("/categories")
+async def get_categories():
+    """
+    사용 가능한 카테고리 목록을 반환합니다.
+    """
+    return {
+        "categories": list(CATEGORY_FOLDER_MAP.keys())
+    }
+
+
+# ============================================
+# 음성 관련 엔드포인트 (Voice Integration)
+# ============================================
+
+# STT 모듈 import 시도 (pyaudio가 없을 수 있음)
+try:
+    from stt_processor import process_audio_and_get_query_async
+    VOICE_AVAILABLE = True
+    print("✅ Voice 모듈 로드 성공")
+except ImportError as e:
+    VOICE_AVAILABLE = False
+    print(f"⚠️ Voice 모듈 로드 실패 (pyaudio 필요): {e}")
+
+
+class VoiceTranscribeRequest(BaseModel):
+    """음성 인식 요청 모델"""
+    duration_seconds: int = Field(default=5, description="녹음 시간 (초)")
+    session_id: Optional[str] = Field(default=None, description="세션 ID")
+
+
+@app.post("/voice/transcribe")
+async def voice_transcribe(duration_seconds: int = 5, session_id: str = None):
+    """
+    마이크 입력을 받아 Amazon Transcribe 스트리밍을 수행하고
+    텍스트로 변환한 후 카테고리 분류까지 수행합니다.
+    
+    ⚠️ 이 엔드포인트는 서버에 마이크가 연결되어 있어야 합니다.
+    브라우저 기반 음성 입력은 /voice/process 엔드포인트를 사용하세요.
+    """
+    if not VOICE_AVAILABLE:
+        raise HTTPException(
+            status_code=503,
+            detail="Voice 모듈을 사용할 수 없습니다. pyaudio와 amazon-transcribe-streaming-sdk를 설치하세요."
+        )
+    
+    try:
+        # STT 수행
+        stt_result = await process_audio_and_get_query_async(duration_seconds)
+        
+        if "error" in stt_result:
+            raise HTTPException(status_code=500, detail=stt_result["error"])
+        
+        transcribed_text = stt_result.get("user_query_text", "")
+        
+        if not transcribed_text:
+            return {
+                "transcribed_text": "",
+                "message": "인식된 음성이 없습니다.",
+                "category": None,
+                "answer": None
+            }
+        
+        # 카테고리 분류 수행
+        inquiry_data = UserInquiry(text=transcribed_text, session_id=session_id)
+        classification_result = await process_inquiry(inquiry_data)
+        
+        return {
+            "transcribed_text": transcribed_text,
+            "timestamp": stt_result.get("timestamp"),
+            **classification_result
+        }
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"음성 처리 오류: {str(e)}")
+
+
+class VoiceTextRequest(BaseModel):
+    """브라우저에서 전송된 음성 텍스트 처리 요청"""
+    text: str = Field(description="Web Speech API로 인식된 텍스트")
+    session_id: Optional[str] = Field(default=None, description="세션 ID")
+    mode: str = Field(default="category", description="처리 모드: 'category' 또는 'form'")
+    form_session_id: Optional[str] = Field(default=None, description="폼 세션 ID (mode='form'일 때)")
+    category: Optional[str] = Field(default=None, description="카테고리 (mode='form'일 때)")
+
+
+@app.post("/voice/process")
+async def voice_process(request: VoiceTextRequest):
+    """
+    브라우저의 Web Speech API로 인식된 텍스트를 처리합니다.
+    
+    흐름:
+    1. mode='category': 카테고리 분류 수행
+       - etc가 아닌 카테고리로 확정되면 → 자동으로 폼 세션 시작 → mode='form'으로 전환
+       - etc면 → 계속 카테고리 모드 유지
+    2. mode='form': 폼 작성 대화 수행
+    """
+    if not request.text or not request.text.strip():
+        add_log("error", input_text="(empty)", details={"error": "텍스트가 비어있습니다."})
+        return {
+            "error": "텍스트가 비어있습니다.",
+            "transcribed_text": ""
+        }
+    
+    transcribed_text = request.text.strip()
+    
+    # 요청 로그
+    add_log(
+        "request_received",
+        current_mode=request.mode,
+        session_id=request.session_id,
+        form_session_id=request.form_session_id,
+        input_text=transcribed_text[:50] + "..." if len(transcribed_text) > 50 else transcribed_text,
+        category=request.category,
+        details={"full_text": transcribed_text}
+    )
+    
+    if request.mode == "form":
+        # 폼 작성 모드
+        add_log(
+            "form_mode_processing",
+            current_mode="form",
+            form_session_id=request.form_session_id,
+            category=request.category,
+            input_text=transcribed_text[:50]
+        )
+        
+        if not request.form_session_id:
+            add_log("error", current_mode="form", details={"error": "폼 세션 ID가 없음"})
+            return {
+                "error": "폼 세션 ID가 필요합니다.",
+                "transcribed_text": transcribed_text
+            }
+        
+        form_result = await process_form_conversation(
+            session_id=request.form_session_id,
+            user_input=transcribed_text,
+            category=request.category
+        )
+        
+        add_log(
+            "form_response",
+            current_mode="form",
+            form_session_id=request.form_session_id,
+            category=request.category,
+            response=form_result.get("response", "")[:100] if form_result.get("response") else None,
+            details={
+                "unfilled_count": form_result.get("unfilled_count"),
+                "completed": form_result.get("completed"),
+                "extracted_fields": form_result.get("extracted_fields", {})
+            }
+        )
+        
+        return {
+            "transcribed_text": transcribed_text,
+            "mode": "form",
+            "form_session_id": request.form_session_id,
+            "category": request.category,
+            **form_result
+        }
+    else:
+        # 카테고리 분류 모드 (기본)
+        add_log(
+            "category_mode_processing",
+            current_mode="category",
+            session_id=request.session_id,
+            input_text=transcribed_text[:50]
+        )
+        
+        inquiry_data = UserInquiry(text=transcribed_text, session_id=request.session_id)
+        classification_result = await process_inquiry(inquiry_data)
+        
+        category = classification_result.get("category")
+        
+        add_log(
+            "category_classified",
+            current_mode="category",
+            session_id=request.session_id,
+            category=category,
+            response=classification_result.get("answer", "")[:100] if classification_result.get("answer") else None,
+            details={"reason": classification_result.get("reason")}
+        )
+        
+        # etc가 아닌 카테고리로 확정되면 → 자동으로 폼 세션 시작
+        if category and category != "etc" and category in CATEGORY_FOLDER_MAP:
+            # 새 폼 세션 생성
+            form_session_id = str(uuid.uuid4())
+            form_state = init_form_session(form_session_id, category)
+            
+            add_log(
+                "mode_change_to_form",
+                current_mode="category→form",
+                form_session_id=form_session_id,
+                category=category,
+                details={
+                    "documents": list(form_state["documents"].keys()) if form_state.get("documents") else [],
+                    "total_fields": sum(doc["total_count"] for doc in form_state["documents"].values()) if form_state.get("documents") else 0
+                }
+            )
+            
+            # 폼 세션이 정상적으로 생성되었는지 확인
+            if form_state and form_state.get("documents"):
+                # 첫 번째 폼 대화 시작 - 초기 질문 생성
+                initial_form_result = await process_form_conversation(
+                    session_id=form_session_id,
+                    user_input="서류 작성을 시작합니다.",
+                    category=category
+                )
+                
+                add_log(
+                    "form_session_started",
+                    current_mode="form",
+                    form_session_id=form_session_id,
+                    category=category,
+                    response=initial_form_result.get("response", "")[:100] if initial_form_result.get("response") else None
+                )
+                
+                return {
+                    "transcribed_text": transcribed_text,
+                    "mode": "form",  # 폼 모드로 전환!
+                    "mode_changed": True,  # 모드가 변경되었음을 알림
+                    "category": category,
+                    "form_session_id": form_session_id,
+                    "category_answer": classification_result.get("answer"),  # 카테고리 분류 답변
+                    "documents": list(form_state["documents"].keys()),
+                    "total_fields": sum(doc["total_count"] for doc in form_state["documents"].values()),
+                    **initial_form_result  # 폼 작성 첫 질문 포함
+                }
+            else:
+                # 폼 세션 생성 실패 (문서가 없음) - 카테고리 모드 유지
+                add_log(
+                    "form_session_failed",
+                    current_mode="category",
+                    category=category,
+                    details={"error": "문서가 없음"}
+                )
+                return {
+                    "transcribed_text": transcribed_text,
+                    "mode": "category",
+                    "category": category,
+                    "answer": classification_result.get("answer"),
+                    "message": f"{category} 카테고리로 분류되었지만, 해당 서류가 없습니다.",
+                    "session_id": request.session_id
+                }
+        
+        # etc 카테고리거나 폼이 없는 경우 - 카테고리 모드 유지
+        add_log(
+            "staying_in_category_mode",
+            current_mode="category",
+            session_id=request.session_id,
+            category=category,
+            details={"reason": "etc 카테고리 또는 폼 없음"}
+        )
+        return {
+            "transcribed_text": transcribed_text,
+            "mode": "category",
+            **classification_result
+        }
+
+
+@app.get("/voice/status")
+async def voice_status():
+    """
+    음성 모듈 상태를 확인합니다.
+    """
+    return {
+        "voice_available": VOICE_AVAILABLE,
+        "web_speech_api": True,  # 브라우저 Web Speech API는 항상 사용 가능
+        "server_stt": VOICE_AVAILABLE,
+        "message": "Web Speech API를 통한 브라우저 음성 인식을 사용할 수 있습니다." if not VOICE_AVAILABLE else "서버 STT와 브라우저 음성 인식 모두 사용 가능합니다."
+    }
+
+
+# ============================================
+# 실시간 모니터링 엔드포인트
+# ============================================
+
+@app.get("/api/logs")
+async def get_logs(limit: int = 50):
+    """최근 로그 조회"""
+    return {
+        "logs": [entry.dict() for entry in log_entries[-limit:]],
+        "total": len(log_entries)
+    }
+
+@app.get("/api/logs/clear")
+async def clear_logs():
+    """로그 초기화"""
+    log_entries.clear()
+    return {"message": "로그가 초기화되었습니다."}
+
+@app.get("/online", response_class=HTMLResponse)
+async def get_monitor_page():
+    """실시간 LLM 흐름 모니터링 페이지"""
+    html_path = os.path.join(os.path.dirname(__file__), "static", "online.html")
+    if os.path.exists(html_path):
+        with open(html_path, "r", encoding="utf-8") as f:
+            return f.read()
+    return """<html>
+        <head><title>모니터링 페이지</title></head>
+        <body>
+            <h1>Static 파일이 없습니다.</h1>
+            <p>app/static/online.html 파일을 생성해주세요.</p>
+        </body>
+    </html>"""
+
+
+# ============================================
+# 프론트엔드 페이지
+# ============================================
+
+@app.get("/", response_class=HTMLResponse)
+async def get_frontend():
+    """메인 테스트 페이지"""
+    html_path = os.path.join(os.path.dirname(__file__), "static", "index.html")
+    if os.path.exists(html_path):
+        with open(html_path, "r", encoding="utf-8") as f:
+            return f.read()
+    return """
+    <html>
+        <head><title>HaThon Kiosk</title></head>
+        <body>
+            <h1>Static 파일이 없습니다.</h1>
+            <p>app/static/index.html 파일을 생성해주세요.</p>
+        </body>
+    </html>
+    """

@@ -1,0 +1,1020 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>행정복지센터 키오스크</title>
+    <link href="https://fonts.googleapis.com/css2?family=Gowun+Batang:wght@400;700&family=IBM+Plex+Sans+KR:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --primary: #1a365d;
+            --primary-light: #2c5282;
+            --accent: #ed8936;
+            --accent-light: #fbd38d;
+            --bg-dark: #0f172a;
+            --bg-card: #1e293b;
+            --bg-message: #334155;
+            --text-primary: #f1f5f9;
+            --text-secondary: #94a3b8;
+            --text-muted: #64748b;
+            --success: #10b981;
+            --border: #475569;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'IBM Plex Sans KR', -apple-system, BlinkMacSystemFont, sans-serif;
+            background: var(--bg-dark);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden;
+        }
+
+        /* 배경 효과 */
+        .bg-pattern {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: 
+                radial-gradient(ellipse at 20% 20%, rgba(26, 54, 93, 0.4) 0%, transparent 50%),
+                radial-gradient(ellipse at 80% 80%, rgba(237, 137, 54, 0.15) 0%, transparent 50%),
+                linear-gradient(180deg, var(--bg-dark) 0%, #1a1a2e 100%);
+            z-index: -1;
+        }
+
+        .bg-grid {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-image: 
+                linear-gradient(rgba(255,255,255,0.02) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(255,255,255,0.02) 1px, transparent 1px);
+            background-size: 50px 50px;
+            z-index: -1;
+        }
+
+        /* 메인 컨테이너 */
+        .kiosk-container {
+            width: 100%;
+            max-width: 800px;
+            height: 100vh;
+            max-height: 900px;
+            display: flex;
+            flex-direction: column;
+            background: var(--bg-card);
+            border-radius: 0;
+            box-shadow: 0 25px 100px rgba(0, 0, 0, 0.5);
+            overflow: hidden;
+        }
+
+        @media (min-width: 900px) {
+            .kiosk-container {
+                height: 90vh;
+                border-radius: 24px;
+                margin: 20px;
+            }
+        }
+
+        /* 헤더 */
+        .header {
+            background: linear-gradient(135deg, var(--primary) 0%, var(--primary-light) 100%);
+            padding: 28px 32px;
+            text-align: center;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .header::before {
+            content: '';
+            position: absolute;
+            top: -50%;
+            right: -20%;
+            width: 300px;
+            height: 300px;
+            background: radial-gradient(circle, rgba(237, 137, 54, 0.2) 0%, transparent 70%);
+            border-radius: 50%;
+        }
+
+        .header-title {
+            font-family: 'Gowun Batang', serif;
+            font-size: 1.8rem;
+            font-weight: 700;
+            color: var(--text-primary);
+            margin-bottom: 8px;
+            position: relative;
+        }
+
+        .header-subtitle {
+            font-size: 0.95rem;
+            color: rgba(255, 255, 255, 0.8);
+            position: relative;
+        }
+
+        /* 채팅 영역 */
+        .chat-area {
+            flex: 1;
+            overflow-y: auto;
+            padding: 24px;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+            scroll-behavior: smooth;
+        }
+
+        .chat-area::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        .chat-area::-webkit-scrollbar-track {
+            background: transparent;
+        }
+
+        .chat-area::-webkit-scrollbar-thumb {
+            background: var(--border);
+            border-radius: 3px;
+        }
+
+        /* 메시지 */
+        .message {
+            display: flex;
+            flex-direction: column;
+            max-width: 85%;
+            animation: fadeSlideIn 0.3s ease-out;
+        }
+
+        @keyframes fadeSlideIn {
+            from {
+                opacity: 0;
+                transform: translateY(10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .message.user {
+            align-self: flex-end;
+            align-items: flex-end;
+        }
+
+        .message.assistant {
+            align-self: flex-start;
+            align-items: flex-start;
+        }
+
+        .message-bubble {
+            padding: 16px 20px;
+            border-radius: 20px;
+            font-size: 1rem;
+            line-height: 1.6;
+            position: relative;
+        }
+
+        .message.user .message-bubble {
+            background: linear-gradient(135deg, var(--accent) 0%, #dd6b20 100%);
+            color: white;
+            border-bottom-right-radius: 6px;
+        }
+
+        .message.assistant .message-bubble {
+            background: var(--bg-message);
+            color: var(--text-primary);
+            border-bottom-left-radius: 6px;
+            border: 1px solid var(--border);
+        }
+
+        .message-time {
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            margin-top: 6px;
+            padding: 0 4px;
+        }
+
+        .category-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 6px 12px;
+            border-radius: 20px;
+            font-size: 0.8rem;
+            font-weight: 600;
+            margin-top: 10px;
+            background: rgba(16, 185, 129, 0.15);
+            color: var(--success);
+            border: 1px solid rgba(16, 185, 129, 0.3);
+        }
+
+        .category-badge::before {
+            content: '📂';
+            font-size: 0.9rem;
+        }
+
+        /* 입력 영역 */
+        .input-area {
+            padding: 20px 24px 28px;
+            background: rgba(15, 23, 42, 0.8);
+            border-top: 1px solid var(--border);
+        }
+
+        /* 음성 상태 표시 */
+        .voice-status {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            padding: 12px;
+            margin-bottom: 16px;
+            background: rgba(30, 41, 59, 0.8);
+            border-radius: 12px;
+            font-size: 0.9rem;
+            color: var(--text-secondary);
+            transition: all 0.3s ease;
+        }
+
+        .voice-status.listening {
+            background: rgba(16, 185, 129, 0.15);
+            color: var(--success);
+            border: 1px solid rgba(16, 185, 129, 0.3);
+        }
+
+        .voice-status.processing {
+            background: rgba(237, 137, 54, 0.15);
+            color: var(--accent);
+            border: 1px solid rgba(237, 137, 54, 0.3);
+        }
+
+        .voice-dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background: var(--text-muted);
+            transition: all 0.3s ease;
+        }
+
+        .voice-status.listening .voice-dot {
+            background: var(--success);
+            animation: pulse 1.5s infinite;
+        }
+
+        .voice-status.processing .voice-dot {
+            background: var(--accent);
+            animation: pulse 0.8s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { transform: scale(1); opacity: 1; }
+            50% { transform: scale(1.3); opacity: 0.7; }
+        }
+
+        /* 실시간 텍스트 표시 */
+        .transcript-preview {
+            padding: 14px 18px;
+            margin-bottom: 16px;
+            background: rgba(51, 65, 85, 0.5);
+            border: 2px dashed var(--border);
+            border-radius: 12px;
+            font-size: 0.95rem;
+            color: var(--text-secondary);
+            min-height: 48px;
+            display: none;
+            transition: all 0.3s ease;
+        }
+
+        .transcript-preview.active {
+            display: block;
+            border-color: var(--success);
+            background: rgba(16, 185, 129, 0.1);
+            color: var(--text-primary);
+        }
+
+        /* 입력 그룹 */
+        .input-group {
+            display: flex;
+            gap: 12px;
+            align-items: stretch;
+        }
+
+        .input-group input {
+            flex: 1;
+            padding: 16px 20px;
+            background: var(--bg-message);
+            border: 2px solid var(--border);
+            border-radius: 16px;
+            font-size: 1rem;
+            color: var(--text-primary);
+            transition: all 0.2s ease;
+        }
+
+        .input-group input::placeholder {
+            color: var(--text-muted);
+        }
+
+        .input-group input:focus {
+            outline: none;
+            border-color: var(--accent);
+            box-shadow: 0 0 0 3px rgba(237, 137, 54, 0.2);
+        }
+
+        /* 버튼 */
+        .btn {
+            padding: 16px 24px;
+            border: none;
+            border-radius: 16px;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .btn-send {
+            background: linear-gradient(135deg, var(--accent) 0%, #dd6b20 100%);
+            color: white;
+            min-width: 80px;
+        }
+
+        .btn-send:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 20px rgba(237, 137, 54, 0.3);
+        }
+
+        .btn-send:disabled {
+            background: var(--border);
+            transform: none;
+            box-shadow: none;
+            cursor: not-allowed;
+        }
+
+        /* 마이크 버튼 */
+        .btn-voice {
+            background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+            color: white;
+            min-width: 60px;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .btn-voice::before {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            width: 0;
+            height: 0;
+            background: rgba(255, 255, 255, 0.2);
+            border-radius: 50%;
+            transform: translate(-50%, -50%);
+            transition: width 0.3s, height 0.3s;
+        }
+
+        .btn-voice:hover::before {
+            width: 100px;
+            height: 100px;
+        }
+
+        .btn-voice.recording {
+            background: linear-gradient(135deg, var(--success) 0%, #059669 100%);
+            animation: recordingPulse 1.5s infinite;
+        }
+
+        @keyframes recordingPulse {
+            0%, 100% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.5); }
+            50% { box-shadow: 0 0 0 15px rgba(16, 185, 129, 0); }
+        }
+
+        .btn-voice svg {
+            width: 24px;
+            height: 24px;
+            position: relative;
+            z-index: 1;
+        }
+
+        /* 음성 미지원 알림 */
+        .voice-not-supported {
+            background: rgba(239, 68, 68, 0.15);
+            color: #fca5a5;
+            padding: 12px 16px;
+            border-radius: 10px;
+            font-size: 0.85rem;
+            margin-bottom: 16px;
+            display: none;
+            border: 1px solid rgba(239, 68, 68, 0.3);
+        }
+
+        /* 웰컴 메시지 특별 스타일 */
+        .welcome-message .message-bubble {
+            background: linear-gradient(135deg, var(--primary) 0%, var(--primary-light) 100%);
+            border: none;
+        }
+
+        .welcome-services {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-top: 16px;
+        }
+
+        .service-chip {
+            padding: 8px 14px;
+            background: rgba(255, 255, 255, 0.15);
+            border-radius: 20px;
+            font-size: 0.85rem;
+            color: rgba(255, 255, 255, 0.9);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+
+        /* 로딩 애니메이션 */
+        .typing-indicator {
+            display: flex;
+            gap: 6px;
+            padding: 16px 20px;
+            background: var(--bg-message);
+            border-radius: 20px;
+            border-bottom-left-radius: 6px;
+            border: 1px solid var(--border);
+            width: fit-content;
+        }
+
+        .typing-indicator span {
+            width: 8px;
+            height: 8px;
+            background: var(--text-muted);
+            border-radius: 50%;
+            animation: typing 1.4s infinite;
+        }
+
+        .typing-indicator span:nth-child(2) { animation-delay: 0.2s; }
+        .typing-indicator span:nth-child(3) { animation-delay: 0.4s; }
+
+        @keyframes typing {
+            0%, 60%, 100% { transform: translateY(0); }
+            30% { transform: translateY(-6px); }
+        }
+
+        /* 모드 전환 알림 */
+        .mode-change-notice, .completion-notice {
+            margin: 16px 0;
+            padding: 16px 20px;
+            border-radius: 16px;
+            animation: fadeSlideIn 0.3s ease-out;
+        }
+
+        .mode-change-notice {
+            background: linear-gradient(135deg, rgba(16, 185, 129, 0.15) 0%, rgba(6, 182, 212, 0.15) 100%);
+            border: 1px solid rgba(16, 185, 129, 0.3);
+        }
+
+        .completion-notice {
+            background: linear-gradient(135deg, rgba(237, 137, 54, 0.15) 0%, rgba(251, 191, 36, 0.15) 100%);
+            border: 1px solid rgba(237, 137, 54, 0.3);
+        }
+
+        .notice-content {
+            display: flex;
+            align-items: center;
+            gap: 14px;
+        }
+
+        .notice-icon {
+            font-size: 1.8rem;
+        }
+
+        .notice-text {
+            flex: 1;
+        }
+
+        .notice-text strong {
+            color: var(--text-primary);
+            font-size: 1rem;
+        }
+
+        .notice-details {
+            color: var(--text-secondary);
+            font-size: 0.85rem;
+            margin-top: 4px;
+        }
+
+        /* 진행률 표시 */
+        .progress-display {
+            margin: 12px 0;
+            padding: 12px 16px;
+            background: rgba(30, 41, 59, 0.6);
+            border-radius: 12px;
+            border: 1px solid var(--border);
+        }
+
+        .progress-info {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 0.85rem;
+            color: var(--text-secondary);
+            margin-bottom: 8px;
+        }
+
+        .progress-bar-mini {
+            height: 6px;
+            background: var(--bg-message);
+            border-radius: 3px;
+            overflow: hidden;
+        }
+
+        .progress-fill-mini {
+            height: 100%;
+            background: linear-gradient(90deg, var(--success), #06b6d4);
+            border-radius: 3px;
+            transition: width 0.3s ease;
+        }
+
+        /* 반응형 */
+        @media (max-width: 600px) {
+            .header {
+                padding: 20px 16px;
+            }
+
+            .header-title {
+                font-size: 1.4rem;
+            }
+
+            .chat-area {
+                padding: 16px;
+            }
+
+            .message {
+                max-width: 90%;
+            }
+
+            .input-area {
+                padding: 16px;
+            }
+
+            .input-group input {
+                padding: 14px 16px;
+            }
+
+            .btn {
+                padding: 14px 18px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="bg-pattern"></div>
+    <div class="bg-grid"></div>
+
+    <div class="kiosk-container">
+        <!-- 헤더 -->
+        <div class="header">
+            <h1 class="header-title">🏛️ 행정복지센터</h1>
+            <p class="header-subtitle">무엇을 도와드릴까요? 말씀해 주세요.</p>
+        </div>
+
+        <!-- 채팅 영역 -->
+        <div class="chat-area" id="chatArea">
+            <div class="message assistant welcome-message">
+                <div class="message-bubble">
+                    안녕하세요! 행정복지센터 AI 상담원입니다. 😊<br><br>
+                    아래 서비스들에 대해 안내해드릴 수 있어요.<br>
+                    <strong>🎤 마이크 버튼</strong>을 누르고 편하게 말씀해 주세요!
+                    <div class="welcome-services">
+                        <span class="service-chip">🏦 국민연금</span>
+                        <span class="service-chip">🏠 전입신고</span>
+                        <span class="service-chip">🏗️ 토지·건축물</span>
+                        <span class="service-chip">💰 청년월세</span>
+                        <span class="service-chip">🏡 주거급여</span>
+                    </div>
+                </div>
+                <div class="message-time">지금</div>
+            </div>
+        </div>
+
+        <!-- 입력 영역 -->
+        <div class="input-area">
+            <div class="voice-not-supported" id="voiceNotSupported">
+                ⚠️ 이 브라우저는 음성 인식을 지원하지 않습니다. Chrome 브라우저를 사용해주세요.
+            </div>
+
+            <div class="voice-status" id="voiceStatus">
+                <span class="voice-dot"></span>
+                <span id="voiceStatusText">🎤 마이크 버튼을 눌러 음성으로 질문하세요</span>
+            </div>
+
+            <div class="transcript-preview" id="transcriptPreview">
+                듣고 있습니다...
+            </div>
+
+            <div class="input-group">
+                <input 
+                    type="text" 
+                    id="chatInput" 
+                    placeholder="질문을 입력하거나 마이크를 눌러주세요..." 
+                    onkeypress="handleKeyPress(event)"
+                >
+                <button class="btn btn-voice" id="voiceBtn" onclick="toggleVoice()" title="음성 입력">
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" />
+                    </svg>
+                </button>
+                <button class="btn btn-send" id="sendBtn" onclick="sendMessage()">전송</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // 상태 관리
+        let sessionId = null;           // 카테고리 분류용 세션 ID
+        let formSessionId = null;       // 폼 작성용 세션 ID
+        let currentMode = 'category';   // 현재 모드: 'category' 또는 'form'
+        let currentCategory = null;     // 확정된 카테고리
+        let recognition = null;
+        let isRecording = false;
+
+        // Web Speech API 초기화
+        function initSpeechRecognition() {
+            if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
+                document.getElementById('voiceNotSupported').style.display = 'block';
+                document.getElementById('voiceBtn').disabled = true;
+                return false;
+            }
+
+            const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+            recognition = new SpeechRecognition();
+            recognition.lang = 'ko-KR';
+            recognition.continuous = true;
+            recognition.interimResults = true;
+
+            recognition.onstart = () => {
+                isRecording = true;
+                updateVoiceUI(true);
+            };
+
+            recognition.onend = () => {
+                isRecording = false;
+                updateVoiceUI(false);
+            };
+
+            recognition.onresult = (event) => {
+                let interimTranscript = '';
+                let finalTranscript = '';
+
+                for (let i = event.resultIndex; i < event.results.length; i++) {
+                    const transcript = event.results[i][0].transcript;
+                    if (event.results[i].isFinal) {
+                        finalTranscript += transcript;
+                    } else {
+                        interimTranscript += transcript;
+                    }
+                }
+
+                // 실시간 프리뷰 업데이트
+                const preview = document.getElementById('transcriptPreview');
+                preview.textContent = finalTranscript || interimTranscript || '듣고 있습니다...';
+
+                // 최종 결과가 있으면 처리
+                if (finalTranscript) {
+                    handleVoiceResult(finalTranscript);
+                }
+            };
+
+            recognition.onerror = (event) => {
+                console.error('음성 인식 오류:', event.error);
+                isRecording = false;
+                updateVoiceUI(false);
+                
+                if (event.error === 'not-allowed') {
+                    alert('마이크 권한이 필요합니다. 브라우저 설정에서 마이크 권한을 허용해주세요.');
+                }
+            };
+
+            return true;
+        }
+
+        function updateVoiceUI(recording) {
+            const btn = document.getElementById('voiceBtn');
+            const status = document.getElementById('voiceStatus');
+            const statusText = document.getElementById('voiceStatusText');
+            const preview = document.getElementById('transcriptPreview');
+
+            if (recording) {
+                btn.classList.add('recording');
+                status.classList.add('listening');
+                status.classList.remove('processing');
+                statusText.textContent = '🎙️ 듣고 있습니다... (다시 클릭하면 중지)';
+                preview.classList.add('active');
+                preview.textContent = '듣고 있습니다...';
+            } else {
+                btn.classList.remove('recording');
+                status.classList.remove('listening');
+                status.classList.remove('processing');
+                statusText.textContent = '🎤 마이크 버튼을 눌러 음성으로 질문하세요';
+                preview.classList.remove('active');
+            }
+        }
+
+        function toggleVoice() {
+            if (!recognition) {
+                if (!initSpeechRecognition()) {
+                    alert('이 브라우저는 음성 인식을 지원하지 않습니다.');
+                    return;
+                }
+            }
+
+            if (isRecording) {
+                recognition.stop();
+            } else {
+                recognition.start();
+            }
+        }
+
+        async function handleVoiceResult(text) {
+            recognition.stop();
+            
+            const status = document.getElementById('voiceStatus');
+            const statusText = document.getElementById('voiceStatusText');
+            
+            status.classList.remove('listening');
+            status.classList.add('processing');
+            statusText.textContent = '⏳ 처리 중...';
+
+            document.getElementById('chatInput').value = text;
+            await sendMessage();
+
+            status.classList.remove('processing');
+            statusText.textContent = '🎤 마이크 버튼을 눌러 음성으로 질문하세요';
+        }
+
+        // 메시지 전송
+        async function sendMessage() {
+            const input = document.getElementById('chatInput');
+            const message = input.value.trim();
+            if (!message) return;
+
+            const sendBtn = document.getElementById('sendBtn');
+            sendBtn.disabled = true;
+            input.disabled = true;
+
+            // 사용자 메시지 추가
+            addMessage(message, 'user');
+            input.value = '';
+
+            // 로딩 표시
+            showTypingIndicator();
+
+            try {
+                // 현재 모드에 따라 요청 데이터 구성
+                const requestBody = currentMode === 'form' 
+                    ? {
+                        text: message,
+                        mode: 'form',
+                        form_session_id: formSessionId,
+                        category: currentCategory
+                    }
+                    : {
+                        text: message,
+                        session_id: sessionId,
+                        mode: 'category'
+                    };
+
+                console.log('[프론트] 요청 전송:', {
+                    currentMode,
+                    requestBody,
+                    formSessionId,
+                    currentCategory
+                });
+
+                const response = await fetch('/voice/process', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(requestBody)
+                });
+
+                const data = await response.json();
+                console.log('[프론트] 응답 수신:', data);
+                
+                // 로딩 제거
+                hideTypingIndicator();
+
+                // 모드 전환 처리 (카테고리 → 폼)
+                if (data.mode_changed && data.mode === 'form') {
+                    console.log('[프론트] 🔄 모드 전환 감지! category → form');
+                    console.log('[프론트] 폼 세션 ID:', data.form_session_id);
+                    console.log('[프론트] 카테고리:', data.category);
+                    
+                    currentMode = 'form';
+                    formSessionId = data.form_session_id;
+                    currentCategory = data.category;
+                    
+                    console.log('[프론트] 모드 전환 완료. 현재 상태:', {
+                        currentMode,
+                        formSessionId,
+                        currentCategory
+                    });
+                    
+                    // 카테고리 확정 메시지 표시
+                    if (data.category_answer) {
+                        addMessage(data.category_answer, 'assistant', data.category);
+                    }
+                    
+                    // 모드 전환 알림
+                    addModeChangeNotice(data.category, data.documents, data.total_fields);
+                    
+                    // 폼 작성 첫 질문 표시
+                    if (data.response) {
+                        addMessage(data.response, 'assistant');
+                    }
+                } else if (currentMode === 'form') {
+                    console.log('[프론트] 📝 폼 모드 응답 처리');
+                    // 폼 모드 응답 처리
+                    if (data.response) {
+                        addMessage(data.response, 'assistant');
+                    }
+                    
+                    // 진행률 표시
+                    if (data.form_state) {
+                        updateProgressDisplay(data.form_state, data.unfilled_count, data.completed);
+                    }
+                    
+                    // 완료 처리
+                    if (data.completed) {
+                        addCompletionNotice();
+                        currentMode = 'category';
+                        formSessionId = null;
+                        currentCategory = null;
+                    }
+                } else {
+                    // 카테고리 모드 응답 처리
+                    console.log('[프론트] 💬 카테고리 모드 응답:', data.category);
+                    if (data.session_id) {
+                        sessionId = data.session_id;
+                        console.log('[프론트] 세션 ID 업데이트:', sessionId);
+                    }
+                    addMessage(data.answer, 'assistant', data.category);
+                }
+
+            } catch (error) {
+                hideTypingIndicator();
+                addMessage('죄송합니다. 오류가 발생했습니다. 다시 시도해주세요.', 'assistant');
+            }
+
+            sendBtn.disabled = false;
+            input.disabled = false;
+            input.focus();
+        }
+
+        function handleKeyPress(event) {
+            if (event.key === 'Enter') {
+                sendMessage();
+            }
+        }
+
+        // 메시지 추가
+        function addMessage(text, type, category = null) {
+            const chatArea = document.getElementById('chatArea');
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `message ${type}`;
+
+            let categoryBadge = '';
+            if (category && type === 'assistant' && category !== 'etc') {
+                categoryBadge = `<span class="category-badge">${category}</span>`;
+            }
+
+            const time = new Date().toLocaleTimeString('ko-KR', { 
+                hour: '2-digit', 
+                minute: '2-digit' 
+            });
+
+            messageDiv.innerHTML = `
+                <div class="message-bubble">${text.replace(/\n/g, '<br>')}</div>
+                ${categoryBadge}
+                <div class="message-time">${time}</div>
+            `;
+
+            chatArea.appendChild(messageDiv);
+            chatArea.scrollTop = chatArea.scrollHeight;
+        }
+
+        // 타이핑 인디케이터
+        function showTypingIndicator() {
+            const chatArea = document.getElementById('chatArea');
+            const indicator = document.createElement('div');
+            indicator.className = 'message assistant';
+            indicator.id = 'typingIndicator';
+            indicator.innerHTML = `
+                <div class="typing-indicator">
+                    <span></span>
+                    <span></span>
+                    <span></span>
+                </div>
+            `;
+            chatArea.appendChild(indicator);
+            chatArea.scrollTop = chatArea.scrollHeight;
+        }
+
+        function hideTypingIndicator() {
+            const indicator = document.getElementById('typingIndicator');
+            if (indicator) {
+                indicator.remove();
+            }
+        }
+
+        // 모드 전환 알림 추가
+        function addModeChangeNotice(category, documents, totalFields) {
+            const chatArea = document.getElementById('chatArea');
+            const noticeDiv = document.createElement('div');
+            noticeDiv.className = 'mode-change-notice';
+            noticeDiv.innerHTML = `
+                <div class="notice-content">
+                    <div class="notice-icon">📝</div>
+                    <div class="notice-text">
+                        <strong>${category}</strong> 서류 작성을 시작합니다
+                        <div class="notice-details">
+                            문서: ${documents ? documents.join(', ') : '-'} | 
+                            총 ${totalFields || 0}개 항목
+                        </div>
+                    </div>
+                </div>
+            `;
+            chatArea.appendChild(noticeDiv);
+            chatArea.scrollTop = chatArea.scrollHeight;
+        }
+
+        // 진행률 표시 업데이트
+        function updateProgressDisplay(formState, unfilledCount, completed) {
+            // 기존 진행률 표시 제거
+            const existingProgress = document.getElementById('progressDisplay');
+            if (existingProgress) {
+                existingProgress.remove();
+            }
+
+            if (completed) return;
+
+            // 총 필드 수 계산
+            let totalFields = 0;
+            let filledFields = 0;
+            for (const doc of Object.values(formState.documents)) {
+                totalFields += doc.total_count;
+                filledFields += doc.filled_count;
+            }
+
+            const percent = totalFields > 0 ? Math.round((filledFields / totalFields) * 100) : 0;
+
+            const chatArea = document.getElementById('chatArea');
+            const progressDiv = document.createElement('div');
+            progressDiv.id = 'progressDisplay';
+            progressDiv.className = 'progress-display';
+            progressDiv.innerHTML = `
+                <div class="progress-info">
+                    <span>📊 진행률: ${filledFields}/${totalFields}</span>
+                    <span>${percent}%</span>
+                </div>
+                <div class="progress-bar-mini">
+                    <div class="progress-fill-mini" style="width: ${percent}%"></div>
+                </div>
+            `;
+            chatArea.appendChild(progressDiv);
+            chatArea.scrollTop = chatArea.scrollHeight;
+        }
+
+        // 완료 알림 추가
+        function addCompletionNotice() {
+            const chatArea = document.getElementById('chatArea');
+            const noticeDiv = document.createElement('div');
+            noticeDiv.className = 'completion-notice';
+            noticeDiv.innerHTML = `
+                <div class="notice-content">
+                    <div class="notice-icon">🎉</div>
+                    <div class="notice-text">
+                        <strong>서류 작성이 완료되었습니다!</strong>
+                        <div class="notice-details">
+                            다른 서비스가 필요하시면 말씀해주세요.
+                        </div>
+                    </div>
+                </div>
+            `;
+            chatArea.appendChild(noticeDiv);
+            chatArea.scrollTop = chatArea.scrollHeight;
+        }
+
+        // 페이지 로드 시 초기화
+        document.addEventListener('DOMContentLoaded', () => {
+            initSpeechRecognition();
+            document.getElementById('chatInput').focus();
+        });
+    </script>
+</body>
+</html>
+

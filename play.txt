@@ -1,0 +1,3 @@
+cd /Users/u4cn/Desktop/PRESENT/Competition/HaThon
+source .venv/bin/activate
+uvicorn main:app --reload
