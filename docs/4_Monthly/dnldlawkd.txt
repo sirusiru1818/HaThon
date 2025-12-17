@@ -1,0 +1,20 @@
+{
+    "delegator.name": "홍길동",
+    "delegator.birthdate": "1990-01-01",
+    "delegator.address": "서울특별시 강남구 테헤란로 123",
+    "delegator.phone": "010-1234-5678",
+
+    "delegate.name": "김철수",
+    "delegate.birthdate": "1995-05-12",
+    "delegate.relationship_to_delegator": "친구",
+    "delegate.phone": "010-9876-5432",
+    "delegate.address": "서울특별시 마포구 월드컵북로 45",
+
+    "civil_service_items.youth_monthly_rent_application": "ㅁ",
+    "civil_service_items.appeal_request": "ㅁ",
+    "civil_service_items.certificate_issuance": "ㅁ",
+
+    "confirmation.date.year": "2025",
+    "confirmation.date.month": "03",
+    "confirmation.date.day": "15"
+}

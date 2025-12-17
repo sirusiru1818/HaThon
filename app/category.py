@@ -123,6 +123,11 @@ def get_session_history(session_id: str) -> BaseChatMessageHistory:
         session_store[session_id] = InMemoryChatMessageHistory()
     return session_store[session_id]
 
+def close_session(session_id: str) -> None:
+    """세션 ID에 해당하는 세션을 종료하고 히스토리를 삭제"""
+    if session_id in session_store:
+        del session_store[session_id]
+
 # etc 카테고리일 때 다른 카테고리로 유도하기 위한 프롬프트
 etc_guidance_prompt = ChatPromptTemplate.from_messages([
     ("system", """당신은 행정복지센터 키오스크 상담원입니다. 
@@ -169,8 +174,7 @@ async def process_inquiry(input_data: UserInquiry):
     category가 etc일 경우 세션을 유지하며 다른 카테고리로 유도합니다.
     """
     user_question = input_data.text
-    session_id = input_data.session_id or str(uuid.uuid4())  # session_id가 없으면 새로 생성
-
+    
     try:
         # 프롬프트에 포맷될 데이터 생성
         inquiry_input = {"question": user_question}
@@ -187,10 +191,23 @@ async def process_inquiry(input_data: UserInquiry):
 
         # category가 etc인 경우, 세션을 유지하며 다른 카테고리로 유도
         if response.category.value == "etc":
+            # etc일 때는 세션을 유지해야 함
+            # 1. 요청에 session_id가 있으면 기존 세션 사용
+            # 2. 없으면 새 세션 생성
+            incoming_session_id = input_data.session_id
+            if incoming_session_id:
+                # 기존 세션 사용
+                session_id = incoming_session_id
+            else:
+                # 새 세션 생성
+                session_id = str(uuid.uuid4())
+            
             # 세션 히스토리를 활용하여 대화 유도
             config = {"configurable": {"session_id": session_id}}
             
             # 세션 히스토리와 함께 대화 유도 체인 실행
+            # RunnableWithMessageHistory가 get_session_history(session_id)를 호출하여
+            # 같은 session_id에 대한 히스토리를 가져와서 사용
             guidance_response = etc_guidance_chain_with_history.invoke(
                 {"question": user_question},
                 config=config
@@ -215,8 +232,13 @@ async def process_inquiry(input_data: UserInquiry):
             }
             return result
 
-        # etc가 아닌 경우 정상 처리
+        # etc가 아닌 경우 정상 처리 및 세션 종료
         answer_text = response.answer[:300] if len(response.answer) > 300 else response.answer
+        
+        # etc가 아닌 경우: 세션이 존재하면 종료 (히스토리 삭제)
+        session_id_to_close = input_data.session_id
+        if session_id_to_close and session_id_to_close in session_store:
+            close_session(session_id_to_close)
 
         result = {
             "question": user_question,
@@ -224,7 +246,8 @@ async def process_inquiry(input_data: UserInquiry):
             "answer": answer_text,
             "message": "질문이 정상적으로 처리되었습니다.",
             "reason": response.reason,
-            "session_id": session_id
+            "session_id": None,  # 세션 종료되었으므로 None 반환
+            "session_closed": True  # 세션이 종료되었음을 명시
         }
         return result
     
