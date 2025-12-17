@@ -1,0 +1,17 @@
+{
+    "delegator.name": { "x": 170, "y": 177 },
+    "delegator.birthdate": { "x": 440, "y": 177 },
+    "delegator.address": { "x": 170, "y": 225 },
+    "delegator.number": { "x": 440, "y": 225 },
+  
+    "delegate.name": { "x": 171, "y": 285 },
+    "delegate.birthdate": { "x": 439, "y": 285 },
+    "delegate.relationship_to_delegator": { "x": 230, "y": 335 },
+    "delegate.number": { "x": 435, "y": 335 },
+    "delegate.address": { "x": 171, "y": 390 },
+  
+    "civil_service_items.rent_request": { "x": 190, "y": 495 },
+    "civil_service_items.appeal_request": { "x": 325, "y": 495 },
+    "civil_service_items.certificate_issuance": { "x": 463, "y": 495 }
+  
+  }

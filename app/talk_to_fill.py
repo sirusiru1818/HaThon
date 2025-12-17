@@ -144,6 +144,7 @@ def extract_field_descriptions(content: str) -> Dict[str, str]:
 def load_category_documents_with_descriptions(category: str) -> Dict[str, Dict[str, Any]]:
     """
     카테고리에 해당하는 폴더의 모든 문서를 로드하고, 필드 설명도 함께 반환합니다.
+    하위 폴더도 탐색합니다.
     
     Returns:
         Dict[str, Dict]: {
@@ -170,34 +171,42 @@ def load_category_documents_with_descriptions(category: str) -> Dict[str, Dict[s
     
     documents = {}
     
-    files = os.listdir(folder_path)
-    print(f"[DEBUG] 폴더 내 파일 목록: {files}")
-    
-    for filename in files:
-        if filename.endswith('.txt') or filename.endswith('.json'):
-            file_path = os.path.join(folder_path, filename)
-            print(f"[DEBUG] 파일 처리 중: {filename}")
-            try:
-                with open(file_path, 'r', encoding='utf-8') as f:
-                    content = f.read()
-                    print(f"[DEBUG] 파일 내용 길이: {len(content)}")
-                    parsed = parse_json_with_comments(content)
-                    print(f"[DEBUG] 파싱 결과: {len(parsed)} 필드")
-                    descriptions = extract_field_descriptions(content)
-                    
-                    if parsed:
-                        doc_name = os.path.splitext(filename)[0]
-                        documents[doc_name] = {
-                            "fields": parsed,
-                            "descriptions": descriptions
-                        }
-                        print(f"[DEBUG] ✅ '{doc_name}' 문서 로드 성공")
-                    else:
-                        print(f"[DEBUG] ❌ '{filename}' 파싱 결과가 비어있습니다.")
-            except Exception as e:
-                print(f"[DEBUG] ❌ 파일 로드 오류 ({filename}): {e}")
-                import traceback
-                traceback.print_exc()
+    # 하위 폴더를 포함하여 모든 파일 탐색
+    for root, dirs, files in os.walk(folder_path):
+        print(f"[DEBUG] 탐색 중인 폴더: {root}")
+        print(f"[DEBUG] 파일 목록: {files}")
+        
+        for filename in files:
+            # _좌표.json 파일은 건너뜀 (PDF 생성용 좌표 파일)
+            if '_좌표' in filename:
+                print(f"[DEBUG] ⏭️  좌표 파일 건너뜀: {filename}")
+                continue
+                
+            # .txt 또는 .json 파일만 처리
+            if filename.endswith('.txt') or filename.endswith('.json'):
+                file_path = os.path.join(root, filename)
+                print(f"[DEBUG] 파일 처리 중: {filename}")
+                try:
+                    with open(file_path, 'r', encoding='utf-8') as f:
+                        content = f.read()
+                        print(f"[DEBUG] 파일 내용 길이: {len(content)}")
+                        parsed = parse_json_with_comments(content)
+                        print(f"[DEBUG] 파싱 결과: {len(parsed)} 필드")
+                        descriptions = extract_field_descriptions(content)
+                        
+                        if parsed:
+                            doc_name = os.path.splitext(filename)[0]
+                            documents[doc_name] = {
+                                "fields": parsed,
+                                "descriptions": descriptions
+                            }
+                            print(f"[DEBUG] ✅ '{doc_name}' 문서 로드 성공")
+                        else:
+                            print(f"[DEBUG] ❌ '{filename}' 파싱 결과가 비어있습니다.")
+                except Exception as e:
+                    print(f"[DEBUG] ❌ 파일 로드 오류 ({filename}): {e}")
+                    import traceback
+                    traceback.print_exc()
     
     print(f"[DEBUG] 최종 로드된 문서 수: {len(documents)}")
     print(f"[DEBUG] 문서 이름들: {list(documents.keys())}")
