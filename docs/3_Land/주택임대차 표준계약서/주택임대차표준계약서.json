@@ -1,0 +1,124 @@
+{
+  // ===== 메타 =====
+  "_meta.form_name": "주택임대차표준계약서",                  // 서식명
+  "_meta.contract_type.deposit_monthly": "V",                // 보증금 있는 월세
+  "_meta.contract_type.jeonse": "",                          // 전세
+  "_meta.contract_type.monthly": "",                         // 월세
+
+  // ===== 임차주택의 표시(부동산 기본정보) =====
+  "property.address.road": "서울시 강남구 테헤란로 123",       // 소재지(도로명주소) (예시 주소로 채움)
+  "property.land.category": "",                               // 토지 지목
+  "property.land.area_sqm": "",                               // 토지 면적(㎡)
+  "property.building.structure_use": "",                      // 건물 구조·용도
+  "property.building.area_sqm": "",                           // 건물 면적(㎡)
+  "property.lease_part.detail": "101동 101호",                // 임차할 부분(동·층·호)
+  "property.lease_part.area_sqm": "",                         // 임차할 부분 면적(㎡)
+
+  // ===== 계약의 종류(체크) =====
+  "contract.kind.new": "V",                                   // 신규 계약
+  "contract.kind.renewal_by_agreement": "",                   // 합의에 의한 재계약
+  "contract.kind.renewal_by_right": "",                       // 계약갱신요구권 행사에 의한 갱신계약
+
+  // 갱신 전 임대차계약 정보(갱신계약일 때만)
+  "contract.previous.period.start": "",                       // 갱신 전 계약기간 시작
+  "contract.previous.period.end": "",                         // 갱신 전 계약기간 종료
+  "contract.previous.deposit": "",                            // 갱신 전 보증금(원)
+  "contract.previous.rent_monthly": "",                       // 갱신 전 차임(월 원)
+
+  // ===== 미납 국세·지방세 / 선순위 확정일자 현황(체크) =====
+  "tax_arrears.none": "V",                                    // 없음
+  "tax_arrears.exists": "",                                   // 있음(확인·설명서에 기재)
+
+  "priority_fixed_date.none": "V",                            // 선순위 확정일자 현황: 해당 없음/없음
+  "priority_fixed_date.exists": "",                           // 해당 있음(확인·설명서에 기재)
+
+  // ===== 계약내용: 보증금/차임/관리비 =====
+  "payment.deposit.amount": "10000000",                       // 보증금(원) (예시용 임의값)
+  "payment.deposit.amount_korean": "",                        // 보증금 금액 한글(원정) 표기
+
+  "payment.contract_money.amount": "1000000",                 // 계약금(원) (예시용 임의값)
+  "payment.contract_money.received": "V",                     // 계약금 계약 시 지급/영수
+  "payment.contract_money.receipt_person": "홍길동",           // 영수자(임대인 또는 수령자)
+
+  "payment.middle_money.amount": "0",                         // 중도금(원) (없으면 0 또는 "")
+  "payment.middle_money.pay_date": "",                        // 중도금 지급일
+
+  "payment.balance.amount": "9000000",                        // 잔금(원) (예시용 임의값)
+  "payment.balance.pay_date": "2024-02-10",                   // 잔금 지급일(예시 날짜로 채움)
+
+  "payment.rent_monthly.amount": "500000",                    // 차임(월세, 원) (예시용 임의값)
+  "payment.rent_monthly.pay_day": "5",                        // 매월 지급일
+  "payment.rent_monthly.deposit_account": "",                 // 입금계좌
+
+  "payment.management_fee.fixed": "",                         // 관리비 정액 여부(정액이면 V)
+  "payment.management_fee.amount": "",                        // 관리비(정액) 금액
+  "payment.management_fee.items_calc": "",                    // 관리비 항목/산정방식(정액 아니면 기재)
+
+  // ===== 임대차기간(제2조) =====
+  "lease.delivery_deadline": "2024-02-10",                    // 임대인이 인도해야 하는 기한
+  "lease.period.start": "2024-02-10",                         // 임대차기간 시작(인도일)
+  "lease.period.end": "2026-02-09",                           // 임대차기간 종료(예시로 2년)
+
+  // ===== 입주 전 수리(제3조) =====
+  "repair.before_move.none": "V",                             // 수리 필요 시설: 없음
+  "repair.before_move.exists": "",                            // 수리 필요 시설: 있음
+  "repair.before_move.details": "",                           // 수리할 내용
+  "repair.before_move.complete_by_balance_date": "V",         // 잔금지급 기일까지 수리 완료
+  "repair.before_move.complete_by_other": "",                 // 기타
+  "repair.before_move.complete_by_other_detail": "",          // 기타 내용
+
+  "repair.not_completed.action.deduct_from_deposit_or_rent": "", // 미수리 시 공제
+  "repair.not_completed.action.other": "",                       // 기타
+  "repair.not_completed.action.other_detail": "",                // 기타 내용
+
+  // ===== 분쟁조정위 조정 신청 동의(별지 안내문에 체크칸 있음) =====
+  "dispute_mediation.apply_before_lawsuit.agree": "V",         // 동의
+  "dispute_mediation.apply_before_lawsuit.disagree": "",       // 미동의
+
+  // ===== 철거/재건축 계획(체크) =====
+  "rebuild_plan.none": "V",                                   // 없음
+  "rebuild_plan.exists": "",                                  // 있음
+  "rebuild_plan.construction_time": "",                       // 공사시기
+  "rebuild_plan.duration_months": "",                         // 소요기간(개월)
+
+  // ===== 상세주소부여 신청 소유자 동의(체크) =====
+  "detail_address_assignment.owner_agree": "V",               // 동의
+  "detail_address_assignment.owner_disagree": "",             // 미동의
+
+  // ===== 특약사항(제13조 아래 특약란) =====
+  "special_terms": "임차인은 인도받은 날부터 전입신고 및 확정일자를 받는다.", // 특약사항(예시 문장)
+
+  // ===== 당사자 정보(페이지3: 임대인/임차인/대리인/중개사) =====
+  // 임대인
+  "landlord.name": "홍길순",                                  // 임대인 성명(예시1의 대리수령인 이름으로 임의 매핑)
+  "landlord.resident_number": "",                             // 임대인 주민등록번호
+  "landlord.address": "경기도 성남시 분당구 판교로 456",      // 임대인 주소(예시1 대리수령인 주소로 임의 매핑)
+  "landlord.phone": "02-987-6543",                            // 임대인 전화(예시1 대리수령인 전화)
+  "landlord.signature": "V",                                  // 서명 또는 날인 여부(표시용)
+
+  // 임차인(신청인/수급자 예시값 사용)
+  "tenant.name": "홍길동",                                    // 임차인 성명
+  "tenant.resident_number": "",                               // 임차인 주민등록번호
+  "tenant.address": "서울시 강남구 테헤란로 123, 101동 101호", // 임차인 주소
+  "tenant.phone": "02-123-4567",                              // 임차인 전화
+  "tenant.signature": "V",                                    // 서명 또는 날인 여부(표시용)
+
+  // 대리인(있을 때만)
+  "landlord.agent.name": "",                                  // 임대인 대리인 성명
+  "landlord.agent.resident_number": "",                       // 임대인 대리인 주민등록번호
+  "landlord.agent.address": "",                               // 임대인 대리인 주소
+
+  "tenant.agent.name": "",                                    // 임차인 대리인 성명
+  "tenant.agent.resident_number": "",                         // 임차인 대리인 주민등록번호
+  "tenant.agent.address": "",                                 // 임차인 대리인 주소
+
+  // 개업공인중개사(중개거래일 때)
+  "broker.office_address": "",                                // 중개사 사무소 소재지
+  "broker.office_name": "",                                   // 사무소 명칭
+  "broker.representative_name": "",                           // 대표
+  "broker.registration_number": "",                           // 등록번호
+  "broker.phone": "",                                         // 전화번호
+
+  // ===== 계약 작성일 =====
+  "signature.date": "2024-02-10"                              // 계약일(년-월-일)
+}

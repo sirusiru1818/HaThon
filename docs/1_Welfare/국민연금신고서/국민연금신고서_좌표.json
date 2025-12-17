@@ -1,0 +1,52 @@
+{
+  // ===== 신고 유형(체크) =====
+  "report_type.disability": { "page": 1, "type": "checkbox", "x": 17, "y": 10.8, "w": 2.5, "h": 2.5 }, // [ ] 장애발생
+  "report_type.death":      { "page": 1, "type": "checkbox", "x": 26, "y": 10.8, "w": 2.5, "h": 2.5 }, // [ ] 사망
+
+  // ===== 가입자 또는 수급권자 =====
+  "person.name":            { "page": 1, "type": "text", "x": 19, "y": 20.0, "w": 24, "h": 3.2 }, // 성명
+  "person.resident_number": { "page": 1, "type": "text", "x": 45, "y": 20.0, "w": 28, "h": 3.2 }, // 주민등록번호
+  "person.phone":           { "page": 1, "type": "text", "x": 24, "y": 24.0, "w": 18, "h": 3.2 }, // 전화번호(자택)
+  "person.mobile":          { "page": 1, "type": "text", "x": 51, "y": 24.0, "w": 22, "h": 3.2 }, // 휴대전화번호
+  "person.address":         { "page": 1, "type": "text", "x": 19, "y": 28.0, "w": 54, "h": 4.0 }, // 주소
+
+  // ===== 진료기관 및 진료기간(표 1줄) =====
+  "medical.institution_name":    { "page": 1, "type": "text", "x": 10.5, "y": 36.8, "w": 18.5, "h": 3.2 }, // 진료기관 명칭
+  "medical.institution_address": { "page": 1, "type": "text", "x": 30.0, "y": 36.8, "w": 19.0, "h": 3.2 }, // 소재지
+  "medical.period.start_first":  { "page": 1, "type": "date", "x": 50.2, "y": 36.8, "w": 10.5, "h": 3.2 }, // 기간-초진
+  "medical.period.end_last":     { "page": 1, "type": "date", "x": 61.2, "y": 36.8, "w": 11.5, "h": 3.2 }, // 기간-최종
+  "medical.diagnosis":           { "page": 1, "type": "text", "x": 73.2, "y": 36.8, "w": 16.0, "h": 3.2 }, // 진단명
+
+  // ===== 장애발생 또는 사망 경위(질병/부상인 경우) =====
+  "incident.illness_injury.date":  { "page": 1, "type": "date", "x": 24.5, "y": 45.0, "w": 16.0, "h": 3.2 }, // 발생일
+  "incident.illness_injury.place": { "page": 1, "type": "text", "x": 52.0, "y": 45.0, "w": 37.0, "h": 3.2 }, // 발생장소
+
+  // ===== 사망의 경우 =====
+  "death.datetime":          { "page": 1, "type": "text", "x": 24.5, "y": 49.2, "w": 25.0, "h": 3.2 }, // 사망일시
+  "death.place":             { "page": 1, "type": "text", "x": 52.0, "y": 49.2, "w": 37.0, "h": 3.2 }, // 사망장소
+  "death.cause_illness_injury": { "page": 1, "type": "text", "x": 24.5, "y": 53.2, "w": 40.0, "h": 3.2 }, // 사망 원인 질병/부상
+  "death.cause_first_visit_date": { "page": 1, "type": "date", "x": 70.5, "y": 53.2, "w": 18.5, "h": 3.2 }, // 초진일
+
+  // ===== 경위 서술(육하원칙) =====
+  "incident.description": { "page": 1, "type": "textarea", "x": 10.5, "y": 57.0, "w": 78.5, "h": 8.5 }, // 경위:
+
+  // ===== 제3자 가해(해당 시) - 가해자(대표) =====
+  "third_party.perpetrator.name":            { "page": 1, "type": "text", "x": 24.5, "y": 68.0, "w": 20.0, "h": 3.2 }, // 성명
+  "third_party.perpetrator.resident_number": { "page": 1, "type": "text", "x": 46.0, "y": 68.0, "w": 24.0, "h": 3.2 }, // 주민등록번호
+  "third_party.perpetrator.phone":           { "page": 1, "type": "text", "x": 24.5, "y": 72.0, "w": 20.0, "h": 3.2 }, // 전화번호(자택)
+  "third_party.perpetrator.mobile":          { "page": 1, "type": "text", "x": 46.0, "y": 72.0, "w": 24.0, "h": 3.2 }, // 휴대전화번호
+  "third_party.perpetrator.address":         { "page": 1, "type": "text", "x": 24.5, "y": 76.0, "w": 64.5, "h": 3.6 }, // 주소
+  "third_party.agreement":                   { "page": 1, "type": "textarea", "x": 24.5, "y": 80.0, "w": 64.5, "h": 4.8 }, // 합의사항
+
+  // ===== 신고인 =====
+  "reporter.name":            { "page": 1, "type": "text", "x": 19, "y": 86.0, "w": 24, "h": 3.2 }, // 신고인 성명
+  "reporter.resident_number": { "page": 1, "type": "text", "x": 45, "y": 86.0, "w": 28, "h": 3.2 }, // 신고인 주민등록번호
+  "reporter.phone":           { "page": 1, "type": "text", "x": 24, "y": 90.0, "w": 18, "h": 3.2 }, // 신고인 전화번호(자택)
+  "reporter.mobile":          { "page": 1, "type": "text", "x": 51, "y": 90.0, "w": 22, "h": 3.2 }, // 신고인 휴대전화번호
+  "reporter.relationship_to_person": { "page": 1, "type": "text", "x": 74.5, "y": 90.0, "w": 14.0, "h": 3.2 }, // 가입자와의 관계
+  "reporter.address":         { "page": 1, "type": "text", "x": 19, "y": 94.0, "w": 54, "h": 3.6 }, // 신고인 주소
+
+  // ===== 날짜/서명 =====
+  "signature.date":           { "page": 1, "type": "date", "x": 32, "y": 98.0, "w": 22, "h": 3.0 }, // 년 월 일
+  "signature.reporter_name":  { "page": 1, "type": "text", "x": 58, "y": 98.0, "w": 20, "h": 3.0 }  // 신고인(서명 또는 인)
+}

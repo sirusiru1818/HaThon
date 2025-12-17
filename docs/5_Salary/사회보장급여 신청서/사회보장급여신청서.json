@@ -1,0 +1,67 @@
+{
+  // ===== 메타 =====
+  "_meta.form_name": "사회보장급여 신청(변경)서",              // 서식명
+  "_meta.form_code": "별지 제1호서식",                       // 서식번호
+  "_meta.revision_date": "2025-01-01",                      // 개정일(서식 상단)
+
+  // ===== 신청인(예시 1의 '수급자' 정보를 신청인에 매핑) =====
+  "applicant.name": "홍길동",                               // 신청인 성명
+  "applicant.resident_number": "",                          // 주민등록번호(예시에는 생년월일만 있어 빈칸)
+  "applicant.relationship_to_head": "",                     // 세대주와의 관계
+  "applicant.phone": "02-123-4567",                         // 전화번호
+  "applicant.mobile": "010-1234-5678",                      // 휴대전화
+  "applicant.address.registered": "서울시 강남구 테헤란로 123, 101동 101호", // 주민등록상 주소(예시 주소로 채움)
+  "applicant.address.actual": "",                           // 실거주지 주소(다르면 기재)
+  "applicant.email": "",                                    // 전자우편
+
+  // ===== 가족사항(서식에 배우자 관계 체크가 있음) =====
+  "family.spouse.legal_marriage": "",                       // 배우자 관계: 법률혼 체크
+  "family.spouse.common_law": "",                           // 배우자 관계: 사실혼 체크
+  "family.spouse.separated": "",                            // 배우자 관계: 사실상 이혼 체크
+  "family.foreign_passport_holder": "",                     // 외국여권 소지자명
+  "family.born_abroad": "",                                 // 국외출생자명
+  "family.multiple_nationality": "",                         // 복수국적자명
+
+  // ===== 부양의무자(해당자만) =====
+  "support_obligor.exists": "",                             // 부양의무자 조사 대상 여부(있으면 V)
+  "support_obligor.name": "",                               // 부양의무자 성명
+  "support_obligor.resident_number": "",                    // 부양의무자 주민등록번호
+  "support_obligor.address": "",                            // 부양의무자 주소
+  "support_obligor.household_size": "",                     // 부양의무자 가구원수
+  "support_obligor.phone": "",                              // 부양의무자 전화번호
+
+  // ===== 급여계좌(예시 1의 '지급계좌') =====
+  "bank_account.relationship_to_applicant": "",             // 신청인과의 관계(본인/대리 등)
+  "bank_account.name": "홍길동",                            // 예금주 성명(예시 1 수급자 이름으로 채움)
+  "bank_account.bank_name": "KB국민은행",                   // 금융기관명
+  "bank_account.account_number": "123-456-78-901234",       // 계좌번호
+  "bank_account.note": "",                                  // 비고(사유)
+
+  // ===== 통지방법(서식 체크박스) =====
+  "notification.method.paper": "",                          // 서면
+  "notification.method.email": "",                          // 전자우편(E-mail)
+  "notification.method.sms": "V",                            // 문자메시지(SMS) - 예시엔 없어서 임의로 V(원하면 바꿔줘)
+  "notification.method.other": "",                          // 기타
+
+  // ===== 사회보장급여 내용(체크박스) =====
+  "benefit.basic_living.livelihood": "",                    // 기초생활보장: 생계급여
+  "benefit.basic_living.medical": "",                       // 기초생활보장: 의료급여
+  "benefit.basic_living.housing.self_owned": "",            // 주거급여: 자가
+  "benefit.basic_living.housing.rent": "",                  // 주거급여: 임차
+  "benefit.basic_living.housing.other": "",                 // 주거급여: 기타
+  "benefit.basic_living.education": "",                     // 교육급여(바우처)
+
+  // 예시 1이 “수급자(1950년생)” 케이스라 노인 급여로 한 칸 체크해둠(필요 없으면 ""로 바꾸면 됨)
+  "benefit.elderly.basic_pension": "V",                     // 노인: 기초연금
+  "benefit.elderly.spouse_joint": "",                       // (배우자 동시신청)
+
+  // ===== 선택적 동의/확인(서식 체크) =====
+  "consent.personal_info_collection": "",                   // 개인정보 수집·이용 동의(필수)
+  "consent.third_party_provision": "",                      // 개인정보 제3자 제공 동의
+  "confirmation.notice_checked": "",                        // 유의사항 확인(√)
+
+  // ===== 서명 =====
+  "signature.applicant_name": "홍길동",                     // 신청인 성명(서명/인)
+  "signature.spouse_name": "",                              // 배우자(동시신청 시)
+  "signature.date": "2024-02-10"                            // 작성일(예시 1의 종료일로 임의 매핑)
+}

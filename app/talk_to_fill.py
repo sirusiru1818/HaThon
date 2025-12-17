@@ -35,6 +35,152 @@ CATEGORY_FOLDER_MAP = {
     "주거급여": "5_Salary"
 }
 
+# 공통 필드 매핑: 같은 카테고리 내에서만 같은 의미의 필드들을 그룹화
+# 예: 청년월세 신청 시 위임장과 대리수령 사이에서만 공통 필드 자동 채움
+COMMON_FIELD_GROUPS_BY_CATEGORY = {
+    # ========== 청년월세 (4_Monthly) ==========
+    "청년월세": [
+        # 그룹 1: 본인 이름 (위임하는 사람 = 수급자)
+        {
+            "delegator.name",              # 위임장: 위임하는 사람 이름
+            "recipient.name",              # 대리수령: 수급자 이름
+            "signature.applicant_name",    # 서명
+            "signature.reporter_name"      # 서명
+        },
+        # 그룹 2: 본인 생년월일
+        {
+            "delegator.birthdate",         # 위임장
+            "recipient.birthdate"          # 대리수령
+        },
+        # 그룹 3: 본인 전화번호
+        {
+            "delegator.number",            # 위임장
+            "recipient.number"             # 대리수령
+        },
+        # 그룹 4: 본인 휴대전화
+        {
+            "recipient.mobile"             # 대리수령
+        },
+        # 그룹 5: 본인 주소
+        {
+            "delegator.address",           # 위임장
+            "recipient.address"            # 대리수령
+        },
+        # 그룹 6: 대리인 이름
+        {
+            "delegate.name",                      # 위임장: 위임받는 사람
+            "representative_recipient.name"       # 대리수령: 대리 수령인
+        },
+        # 그룹 7: 대리인 생년월일
+        {
+            "delegate.birthdate",                 # 위임장
+            "representative_recipient.birthdate"  # 대리수령
+        },
+        # 그룹 8: 대리인 전화번호
+        {
+            "delegate.number",                    # 위임장
+            "representative_recipient.phone",     # 대리수령
+            "representative_recipient.number"     # 대리수령
+        },
+        # 그룹 9: 대리인 주소
+        {
+            "delegate.address",                   # 위임장
+            "representative_recipient.address"    # 대리수령
+        },
+        # 그룹 10: 관계
+        {
+            "delegate.relationship_to_delegator",                 # 위임장
+            "representative_recipient.relationship_to_recipient"  # 대리수령
+        }
+    ],
+    
+    # ========== 국민연금 (1_Welfare) ==========
+    "국민연금": [
+        # 그룹 1: 본인 이름
+        {
+            "person.name",                 # 국민연금신고서: 가입자/수급권자
+            "reporter.name",               # 국민연금신고서: 신고인 (본인일 때)
+            "subscriber.name",             # 국민연금가입자증명서
+            "signature.applicant_name",    # 서명
+            "signature.reporter_name"      # 서명
+        },
+        # 그룹 2: 주민등록번호
+        {
+            "person.resident_number",      # 국민연금신고서
+            "reporter.resident_number",    # 국민연금신고서
+            "subscriber.resident_number"   # 국민연금가입자증명서
+        },
+        # 그룹 3: 전화번호
+        {
+            "person.phone",                # 국민연금신고서
+            "reporter.phone",              # 국민연금신고서
+            "subscriber.phone"             # 국민연금가입자증명서
+        },
+        # 그룹 4: 휴대전화
+        {
+            "person.mobile",               # 국민연금신고서
+            "reporter.mobile",             # 국민연금신고서
+            "subscriber.mobile"            # 국민연금가입자증명서
+        },
+        # 그룹 5: 주소
+        {
+            "person.address",              # 국민연금신고서
+            "reporter.address",            # 국민연금신고서
+            "subscriber.address"           # 국민연금가입자증명서
+        }
+    ],
+    
+    # ========== 전입신고 (2_Report) ==========
+    "전입신고": [
+        # 단일 문서이므로 공통 필드 없음
+    ],
+    
+    # ========== 토지-건축물 (3_Land) ==========
+    "토지-건축물": [
+        # 단일 문서이므로 공통 필드 없음
+    ],
+    
+    # ========== 주거급여 (5_Salary) ==========
+    "주거급여": [
+        # 그룹 1: 본인 이름
+        {
+            "recipient.name",              # 근로활동및소득신고서: 수급권자
+            "applicant.name",              # 사회보장급여신청서: 신청인
+            "signature.applicant_name",    # 서명
+            "signature.reporter_name",     # 서명
+            "bank_account.name"            # 사회보장급여신청서: 예금주
+        },
+        # 그룹 2: 생년월일
+        {
+            "recipient.birthdate"          # 근로활동및소득신고서
+        },
+        # 그룹 3: 주민등록번호
+        {
+            "applicant.resident_number"    # 사회보장급여신청서
+        },
+        # 그룹 4: 전화번호
+        {
+            "applicant.phone"              # 사회보장급여신청서
+        },
+        # 그룹 5: 휴대전화
+        {
+            "applicant.mobile"             # 사회보장급여신청서
+        },
+        # 그룹 6: 주소
+        {
+            "recipient.address",                 # 근로활동및소득신고서
+            "applicant.address.registered"       # 사회보장급여신청서
+        },
+        # 그룹 7: 은행 계좌
+        {
+            "bank_account.bank_name"       # 금융기관명
+        },
+        {
+            "bank_account.account_number"  # 계좌번호
+        }
+    ]
+}
+
 # docs 폴더 기본 경로
 DOCS_BASE_PATH = os.path.join(os.path.dirname(os.path.dirname(__file__)), "docs")
 
@@ -268,6 +414,7 @@ def get_form_session(session_id: str) -> Optional[Dict[str, Any]]:
 def update_form_field(session_id: str, document_name: str, field_name: str, value: str) -> bool:
     """
     특정 필드의 값을 업데이트합니다.
+    공통 필드가 있으면 다른 문서의 같은 의미 필드도 자동으로 채웁니다.
     """
     session = form_session_store.get(session_id)
     if not session:
@@ -287,9 +434,65 @@ def update_form_field(session_id: str, document_name: str, field_name: str, valu
         elif old_value != "" and value == "":
             doc["filled_count"] -= 1
         
+        # 🔥 공통 필드 자동 채우기
+        # 현재 필드와 같은 그룹의 필드들을 찾아서 자동으로 채움
+        auto_fill_common_fields(session_id, field_name, value)
+        
         return True
     
     return False
+
+
+def auto_fill_common_fields(session_id: str, source_field: str, value: str):
+    """
+    공통 필드 자동 채우기: 같은 카테고리 내에서 한 필드가 채워지면 같은 그룹의 다른 필드들도 자동으로 채움
+    """
+    session = form_session_store.get(session_id)
+    if not session:
+        return
+    
+    # 현재 세션의 카테고리 가져오기
+    category = session.get("category")
+    if not category:
+        return
+    
+    # 해당 카테고리의 공통 필드 그룹 가져오기
+    category_groups = COMMON_FIELD_GROUPS_BY_CATEGORY.get(category, [])
+    if not category_groups:
+        return  # 해당 카테고리에 공통 필드 그룹이 없으면 무시
+    
+    # 현재 필드가 속한 그룹 찾기
+    related_fields = None
+    for group in category_groups:
+        if source_field in group:
+            related_fields = group
+            break
+    
+    if not related_fields:
+        return  # 공통 필드가 아니면 무시
+    
+    print(f"[AUTO_FILL] '{source_field}' 필드가 업데이트됨 (카테고리: {category})")
+    print(f"[AUTO_FILL] 관련 필드들: {related_fields}")
+    print(f"[AUTO_FILL] 채울 값: {value}")
+    
+    # 같은 그룹의 다른 필드들을 같은 카테고리의 모든 문서에서 찾아서 채우기
+    for doc_name, doc_data in session["documents"].items():
+        for field in related_fields:
+            if field == source_field:
+                continue  # 원본 필드는 건너뜀
+            
+            if field in doc_data["fields"]:
+                old_value = doc_data["fields"][field]
+                
+                # 이미 채워진 필드는 덮어쓰지 않음
+                if old_value and old_value != "":
+                    print(f"[AUTO_FILL] ⏭️  {doc_name}.{field} - 이미 값이 있음: {old_value}")
+                    continue
+                
+                # 자동으로 값 채우기
+                doc_data["fields"][field] = value
+                doc_data["filled_count"] += 1
+                print(f"[AUTO_FILL] ✅ {doc_name}.{field} = {value}")
 
 
 def get_unfilled_fields(session_id: str, document_name: str = None) -> List[Dict[str, str]]:
@@ -332,39 +535,58 @@ def close_form_session(session_id: str) -> Optional[Dict[str, Any]]:
 # 폼 작성 유도 프롬프트
 form_filling_prompt = ChatPromptTemplate.from_messages([
     ("system", """당신은 행정복지센터 키오스크 상담원입니다.
-사용자가 {category} 관련 서류를 작성하도록 도와주고 있습니다.
+사용자가 {category} 신청에 필요한 정보를 제공하도록 자연스럽게 대화하며 도와주고 있습니다.
 
-현재 작성 중인 서류: {current_document}
+✅✅✅ 이미 수집한 정보 (절대 다시 묻지 마세요!):
+{filled_info}
 
-아직 채워지지 않은 필드들:
+❓❓❓ 아직 필요한 정보들 (이것만 물어보세요):
 {unfilled_fields}
 
-🚨🚨🚨 절대적으로 엄수해야 할 규칙 🚨🚨🚨
+🚨🚨🚨 생명처럼 중요한 규칙 - 위반 시 시스템 오작동! 🚨🚨🚨
 
-1. ❌ 금지된 표현 (미작성 필드가 남아있을 때):
+【규칙 1】 응답 형식 - 반드시 질문으로 끝내기!
+   ✅ 좋은 예: "성함이 어떻게 되시나요?"
+   ✅ 좋은 예: "생년월일을 알려주시겠어요?"
+   ❌ 나쁜 예: "감사합니다." (질문이 아님!)
+   ❌ 나쁜 예: "알겠습니다. 다음으로 넘어가겠습니다." (질문이 아님!)
+   
+   → 항상 물음표(?)로 끝나야 합니다!
+   → 진술이나 감사 인사로 끝내지 마세요!
+
+【규칙 2】 이미 수집한 정보 절대 다시 묻지 않기!
+   - 위의 "✅✅✅ 이미 수집한 정보" 목록에 있는 것은 절대 다시 묻지 마세요
+   - 예: 이름이 이미 목록에 있으면 "성함이 어떻게 되시나요?" 절대 금지!
+   - 오직 "❓❓❓ 아직 필요한 정보들"에 있는 것만 물어보세요
+
+【규칙 3】 완료 판단 금지 - 당신은 완료를 판단하지 않습니다!
+   ❌ 절대 사용 금지 표현:
    - "작성 완료", "완료되었습니다", "끝났습니다"
-   - "모든 정보가 입력되었습니다", "서류가 완성되었습니다"
-   - "다 되었습니다", "마무리되었습니다"
-   → 위의 "아직 채워지지 않은 필드들"에 항목이 하나라도 있으면 이런 말을 절대 하지 마세요!
+   - "모든 정보가 입력", "다 되었습니다", "감사합니다"
+   - "마무리되었습니다", "수고하셨습니다"
+   
+   ✅ 올바른 행동:
+   - "❓❓❓ 아직 필요한 정보들"에 항목이 있으면 계속 질문
+   - 시스템이 자동으로 완료 여부를 판단합니다
+   - 당신은 그냥 계속 정보를 수집하세요
 
-2. ✅ 해야 할 행동:
-   - 아직 채워지지 않은 필드에 대해서만 질문하세요.
-   - 한 번에 1-2개의 정보만 물어보세요.
-   - 사용자가 답변하면 다음 필드로 넘어가세요.
+【규칙 4】 서류 이름/문서 전환 언급 금지
+   ❌ 금지: "위임장", "대리수령", "신청서", "다음 서류로..."
+   ✅ 허용: 그냥 자연스럽게 다음 정보 물어보기
 
-3. 💡 사용자가 "필요없어", "모르겠어", "해당없어"라고 하면:
-   - "알겠습니다. 그럼 다음으로 넘어가겠습니다."라고 말하세요.
-   - 절대 "작성 완료"라고 하지 마세요. 다음 필드를 물어보세요.
+【규칙 5】 한 번에 1개 정보만 물어보기
+   ✅ 좋은 예: "연락처는 어떻게 되시나요?"
+   ❌ 나쁜 예: "연락처와 주소를 알려주세요." (한 번에 2개)
 
-4. 📝 응답 형식:
-   - 짧고 명확하게 (300자 이내)
-   - 필드명을 직접 언급하지 말고 자연스럽게 질문
-   - 예: "성함이 어떻게 되시나요?", "생년월일을 알려주시겠어요?"
+🎯 응답 템플릿 (반드시 따르세요):
+1. 사용자 답변 확인 (선택): "네, 알겠습니다."
+2. 다음 질문 (필수): "[필요한 정보]는 어떻게 되시나요?"
+3. 물음표(?) 확인 (필수): 반드시 ?로 끝나야 함!
 
-5. ⚠️ 완료 판단:
-   - 시스템이 자동으로 판단합니다.
-   - 당신은 절대로 "완료"를 언급하지 마세요.
-   - "아직 채워지지 않은 필드들" 목록에 항목이 있으면 계속 질문하세요.
+예시:
+- "네, 알겠습니다. 생년월일을 알려주시겠어요?"
+- "감사합니다. 현재 거주하시는 주소는 어떻게 되시나요?"
+- "연락처는 어떻게 되시나요?"
 """),
     MessagesPlaceholder(variable_name="history"),
     ("human", "{user_input}")
@@ -526,8 +748,9 @@ async def process_form_conversation(
     # 대화 응답 생성
     # ⚠️ 중요: "모든 필드가 채워졌습니다" 같은 메시지를 LLM에게 보내지 않기!
     if unfilled and len(unfilled) > 0:
+        # 필드명(field)을 숨기고 설명(description)만 보여주기
         unfilled_str = "\n".join([
-            f"- {f['description']} ({f['field']})" 
+            f"- {f['description']}" 
             for f in unfilled[:5]
         ])
     else:
@@ -551,6 +774,24 @@ async def process_form_conversation(
             "completed": True
         }
     
+    # 이미 채워진 정보 수집 (LLM이 중복 질문하지 않도록)
+    filled_info_list = []
+    filled_field_descriptions = []  # 필드 설명만 저장 (검증용)
+    
+    for doc_name, doc_data in session["documents"].items():
+        for field_name, field_value in doc_data["fields"].items():
+            if field_value and field_value != "" and field_value != "N/A":
+                # 설명 가져오기
+                field_desc = doc_data["descriptions"].get(field_name, field_name)
+                filled_info_list.append(f"- {field_desc}: {field_value}")
+                filled_field_descriptions.append(field_desc)
+    
+    if filled_info_list:
+        filled_info_str = "\n".join(filled_info_list[:15])
+        filled_info_str += f"\n\n⚠️ 위 정보들은 이미 수집했으므로 절대 다시 묻지 마세요!"
+    else:
+        filled_info_str = "(아직 없음)"
+    
     form_chain = create_form_chain(session_id)
     config = {"configurable": {"session_id": session_id}}
     
@@ -560,11 +801,12 @@ async def process_form_conversation(
         print(f"[TALK_TO_FILL]   - 현재 문서: {current_doc or '없음'}")
         print(f"[TALK_TO_FILL]   - 미작성 필드 수: {len(unfilled)}")
         print(f"[TALK_TO_FILL]   - 미작성 필드 (처음 5개): {[f['field'] for f in unfilled[:5]]}")
+        print(f"[TALK_TO_FILL]   - 이미 채워진 정보 수: {len(filled_info_list)}")
         
         response = form_chain.invoke(
             {
                 "category": session["category"],
-                "current_document": current_doc or "없음",
+                "filled_info": filled_info_str,
                 "unfilled_fields": unfilled_str,
                 "user_input": user_input
             },
@@ -587,28 +829,67 @@ async def process_form_conversation(
     print(f"[TALK_TO_FILL]   - 전체 미작성 필드 수: {len(all_unfilled)}")
     print(f"[TALK_TO_FILL]   - 완료: {is_completed}")
     
-    # 🚨 응답 검증: LLM이 잘못된 완료 메시지를 보냈는지 확인
+    # 🚨🚨🚨 응답 검증 시스템 (3중 체크) 🚨🚨🚨
     if not is_completed and response_text:
+        original_response = response_text
+        validation_failed = False
+        
+        # ========== 검증 1: 완료 메시지 체크 ==========
         completion_keywords = [
             "작성 완료", "완료되었습니다", "완료했습니다", "끝났습니다",
             "모든 정보가 입력", "서류가 완성", "다 되었습니다", "마무리되었습니다",
-            "작성이 끝", "입력이 완료", "모두 작성"
+            "작성이 끝", "입력이 완료", "모두 작성", "감사합니다", "수고하셨습니다"
         ]
         
         contains_completion = any(keyword in response_text for keyword in completion_keywords)
         
         if contains_completion:
-            print(f"[TALK_TO_FILL] ⚠️ 경고: LLM이 잘못된 완료 메시지를 생성했습니다!")
-            print(f"[TALK_TO_FILL]   - 원본 응답: {response_text[:200]}")
+            print(f"[TALK_TO_FILL] ❌ 검증 실패 (1/3): 잘못된 완료 메시지 발견!")
+            print(f"[TALK_TO_FILL]   - 원본: {response_text[:200]}")
+            validation_failed = True
+        
+        # ========== 검증 2: 질문으로 끝나는지 체크 ==========
+        # 응답이 물음표(?)로 끝나야 함
+        if not response_text.strip().endswith('?'):
+            print(f"[TALK_TO_FILL] ❌ 검증 실패 (2/3): 질문으로 끝나지 않음!")
+            print(f"[TALK_TO_FILL]   - 원본: {response_text[:200]}")
+            validation_failed = True
+        
+        # ========== 검증 3: 이미 채워진 필드를 다시 물어보는지 체크 ==========
+        # filled_info_list에 있는 필드 설명이 응답에 포함되어 있는지 확인
+        if filled_info_list:
+            for filled_item in filled_info_list[:5]:  # 최근 5개만 체크
+                # "- 이름: 홍길동" 형식에서 필드명 추출
+                if ':' in filled_item:
+                    field_desc = filled_item.split(':')[0].strip().replace('- ', '')
+                    # 응답에 이미 채워진 필드를 다시 물어보는지 체크
+                    ask_patterns = [
+                        f"{field_desc}이 어떻게",
+                        f"{field_desc}은 어떻게",
+                        f"{field_desc}는 어떻게",
+                        f"{field_desc}을 알려",
+                        f"{field_desc}를 알려"
+                    ]
+                    if any(pattern in response_text for pattern in ask_patterns):
+                        print(f"[TALK_TO_FILL] ❌ 검증 실패 (3/3): 이미 채워진 필드를 다시 물어봄!")
+                        print(f"[TALK_TO_FILL]   - 이미 알고 있는 정보: {field_desc}")
+                        print(f"[TALK_TO_FILL]   - 원본: {response_text[:200]}")
+                        validation_failed = True
+                        break
+        
+        # ========== 검증 실패 시 응답 자동 수정 ==========
+        if validation_failed:
+            print(f"[TALK_TO_FILL] 🔧 응답 자동 수정 중...")
             print(f"[TALK_TO_FILL]   - 남은 필드 수: {len(all_unfilled)}")
             
-            # 응답 수정: 완료 메시지 제거하고 다음 질문 추가
+            # 다음 필드로 질문 생성
             if unfilled and len(unfilled) > 0:
                 next_field_desc = unfilled[0]['description']
-                response_text = f"알겠습니다. 그럼 {next_field_desc}는 어떻게 되시나요?"
-                print(f"[TALK_TO_FILL]   - 수정된 응답: {response_text}")
+                response_text = f"알겠습니다. {next_field_desc}는 어떻게 되시나요?"
+                print(f"[TALK_TO_FILL]   - ✅ 수정된 응답: {response_text}")
             else:
-                response_text = "정보를 확인 중입니다. 잠시만 기다려주세요."
+                response_text = "다음 정보를 알려주시겠어요?"
+                print(f"[TALK_TO_FILL]   - ✅ 수정된 응답: {response_text}")
     
     if is_completed:
         session["completed"] = True

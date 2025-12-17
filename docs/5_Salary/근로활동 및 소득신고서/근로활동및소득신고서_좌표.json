@@ -1,0 +1,43 @@
+{
+  // ===== 수급(권)자 =====
+  "recipient.name":      { "page": 1, "type": "text", "x": 23, "y": 16.5, "w": 26, "h": 3.5 }, // 성명
+  "recipient.birthdate": { "page": 1, "type": "date", "x": 57, "y": 16.5, "w": 29, "h": 3.5 }, // 생년월일
+  "recipient.address":   { "page": 1, "type": "text", "x": 23, "y": 21.0, "w": 63, "h": 4.0 }, // 주소
+
+  // ===== 취업상태 유형(체크) =====
+  "employment.type.regular":       { "page": 1, "type": "checkbox", "x": 39.5, "y": 30.7, "w": 2.8, "h": 2.8 }, // 상시근로자
+  "employment.type.temporary":     { "page": 1, "type": "checkbox", "x": 39.5, "y": 34.4, "w": 2.8, "h": 2.8 }, // 임시·일용직
+  "employment.type.self_employed": { "page": 1, "type": "checkbox", "x": 39.5, "y": 38.1, "w": 2.8, "h": 2.8 }, // 자영업
+  "employment.type.other":         { "page": 1, "type": "checkbox", "x": 39.5, "y": 41.8, "w": 2.8, "h": 2.8 }, // 기타
+
+  // ===== 직장(사업장) =====
+  "workplace.name":    { "page": 1, "type": "text", "x": 30, "y": 46.2, "w": 57, "h": 3.5 }, // 직장(사업장)명
+  "workplace.address": { "page": 1, "type": "text", "x": 30, "y": 50.4, "w": 45, "h": 3.5 }, // 직장(사업장)주소
+  "workplace.phone":   { "page": 1, "type": "text", "x": 77, "y": 50.4, "w": 10, "h": 3.5 }, // (전화:)
+
+  // ===== 소득 - 일당제 =====
+  "income.daily.wage":                   { "page": 1, "type": "text", "x": 48, "y": 57.2, "w": 24, "h": 3.2 }, // 1일임금(원)
+  "income.daily.avg_work_days_per_month":{ "page": 1, "type": "text", "x": 48, "y": 61.0, "w": 20, "h": 3.2 }, // 월평균 근로일수(일)
+
+  // ===== 근로시간 =====
+  "work_time.day.morning.start": { "page": 1, "type": "time", "x": 44, "y": 68.0, "w": 9, "h": 3.0 }, // 일시간 오전 시작
+  "work_time.day.morning.end":   { "page": 1, "type": "time", "x": 55, "y": 68.0, "w": 9, "h": 3.0 }, // 일시간 오전 종료
+  "work_time.day.morning.hours": { "page": 1, "type": "text", "x": 67, "y": 68.0, "w": 6, "h": 3.0 }, // (시간)
+
+  "work_time.day.afternoon.start": { "page": 1, "type": "time", "x": 44, "y": 72.0, "w": 9, "h": 3.0 }, // 일시간 오후 시작
+  "work_time.day.afternoon.end":   { "page": 1, "type": "time", "x": 55, "y": 72.0, "w": 9, "h": 3.0 }, // 일시간 오후 종료
+  "work_time.day.afternoon.hours": { "page": 1, "type": "text", "x": 67, "y": 72.0, "w": 6, "h": 3.0 }, // (시간)
+
+  "work_time.week.days":        { "page": 1, "type": "text", "x": 49, "y": 76.0, "w": 10, "h": 3.0 }, // 주당 근로일수(일)
+  "work_time.week.total_hours": { "page": 1, "type": "text", "x": 57, "y": 80.0, "w": 12, "h": 3.0 }, // 주 근로시간(총 시간)
+
+  // ===== 소득 - 월급제/자영업/기타 =====
+  "income.monthly.salary":         { "page": 1, "type": "text", "x": 45, "y": 86.2, "w": 36, "h": 3.2 }, // 월 평균 총급여(원)
+  "income.self_employed.monthly":  { "page": 1, "type": "text", "x": 45, "y": 90.1, "w": 36, "h": 3.2 }, // 자영업 월 평균 총소득(원)
+  "income.other.monthly":          { "page": 1, "type": "text", "x": 45, "y": 94.0, "w": 36, "h": 3.2 }, // 기타 월 평균 총소득(원)
+  "income.other.previous_support_org": { "page": 1, "type": "text", "x": 55, "y": 97.2, "w": 30, "h": 3.0 }, // (이전소득일 경우 지원하는곳)
+
+  // ===== 신고/서명 =====
+  "signature.date":          { "page": 1, "type": "date", "x": 44, "y": 105.0, "w": 20, "h": 3.0 }, // 년 월 일
+  "signature.reporter_name": { "page": 1, "type": "text", "x": 44, "y": 109.0, "w": 20, "h": 3.0 }  // 신고자(인)
+}

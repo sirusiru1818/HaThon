@@ -1,0 +1,83 @@
+{
+  /* =========================
+     1페이지 : 신청인 / 가족 / 부양의무자 / 계좌 / 통지방법
+     ========================= */
+
+  // 신청인
+  "applicant.name": { "page": 1, "type": "text", "x": 15, "y": 18.8, "w": 20, "h": 3.2 },              // 성명
+  "applicant.resident_number": { "page": 1, "type": "text", "x": 36, "y": 18.8, "w": 27, "h": 3.2 }, // 주민등록번호
+  "applicant.relationship_to_head": { "page": 1, "type": "text", "x": 64, "y": 18.8, "w": 12, "h": 3.2 }, // 세대주와의 관계
+  "applicant.phone": { "page": 1, "type": "text", "x": 77, "y": 18.8, "w": 18, "h": 3.2 },            // 전화번호
+  "applicant.mobile": { "page": 1, "type": "text", "x": 77, "y": 23.1, "w": 18, "h": 3.2 },           // 휴대전화
+  "applicant.address.registered": { "page": 1, "type": "text", "x": 15, "y": 23.1, "w": 61, "h": 3.2 }, // 주민등록상 주소
+  "applicant.address.actual": { "page": 1, "type": "text", "x": 20, "y": 26.6, "w": 56, "h": 3.2 },     // 실거주지 주소
+  "applicant.email": { "page": 1, "type": "text", "x": 77, "y": 26.6, "w": 18, "h": 3.2 },            // 이메일
+
+  // 가족사항 (행 반복 구조)
+  "family.rows[].relationship": { "page": 1, "type": "text", "x": 10, "y": 34.0, "w": 8, "h": 3.0 }, // 관계
+  "family.rows[].name": { "page": 1, "type": "text", "x": 18, "y": 34.0, "w": 10, "h": 3.0 },         // 성명
+  "family.rows[].resident_number": { "page": 1, "type": "text", "x": 28, "y": 34.0, "w": 16, "h": 3.0 }, // 주민번호
+  "family.rows[].cohabitation": { "page": 1, "type": "text", "x": 44, "y": 34.0, "w": 10, "h": 3.0 }, // 동거여부/사유
+  "family.rows[].education": { "page": 1, "type": "text", "x": 54, "y": 34.0, "w": 14, "h": 3.0 },   // 학력·재학
+  "family.rows[].health": { "page": 1, "type": "text", "x": 68, "y": 34.0, "w": 10, "h": 3.0 },      // 장애·질병
+  "family.rows[].employment": { "page": 1, "type": "text", "x": 78, "y": 34.0, "w": 8, "h": 3.0 },   // 취업상태
+  "family.rows[].job": { "page": 1, "type": "text", "x": 78, "y": 37.2, "w": 8, "h": 3.0 },          // 직업
+  "family.rows[].workplace": { "page": 1, "type": "text", "x": 86, "y": 37.2, "w": 9, "h": 3.0 },    // 직장명
+
+  // 배우자 관계
+  "family.spouse.legal_marriage": { "page": 1, "type": "checkbox", "x": 22, "y": 58.7, "w": 2.5, "h": 2.5 }, // 법률혼
+  "family.spouse.common_law": { "page": 1, "type": "checkbox", "x": 30, "y": 58.7, "w": 2.5, "h": 2.5 },     // 사실혼
+  "family.spouse.separated": { "page": 1, "type": "checkbox", "x": 38, "y": 58.7, "w": 2.5, "h": 2.5 },      // 사실상 이혼
+
+  // 부양의무자 (반복)
+  "support_obligor.rows[].relationship": { "page": 1, "type": "text", "x": 10, "y": 69.0, "w": 10, "h": 3.0 },
+  "support_obligor.rows[].name": { "page": 1, "type": "text", "x": 20, "y": 69.0, "w": 12, "h": 3.0 },
+  "support_obligor.rows[].resident_number": { "page": 1, "type": "text", "x": 32, "y": 69.0, "w": 18, "h": 3.0 },
+  "support_obligor.rows[].address": { "page": 1, "type": "text", "x": 50, "y": 69.0, "w": 20, "h": 3.0 },
+  "support_obligor.rows[].household_size": { "page": 1, "type": "text", "x": 70, "y": 69.0, "w": 10, "h": 3.0 },
+  "support_obligor.rows[].phone": { "page": 1, "type": "text", "x": 80, "y": 69.0, "w": 15, "h": 3.0 },
+
+  // 급여 계좌
+  "bank_account.relationship": { "page": 1, "type": "text", "x": 10, "y": 82.0, "w": 12, "h": 3.0 },
+  "bank_account.holder_name": { "page": 1, "type": "text", "x": 22, "y": 82.0, "w": 18, "h": 3.0 },
+  "bank_account.bank_name": { "page": 1, "type": "text", "x": 40, "y": 82.0, "w": 20, "h": 3.0 },
+  "bank_account.account_number": { "page": 1, "type": "text", "x": 60, "y": 82.0, "w": 20, "h": 3.0 },
+
+  // 통지방법
+  "notification.paper": { "page": 1, "type": "checkbox", "x": 16, "y": 90.0, "w": 2.5, "h": 2.5 },
+  "notification.email": { "page": 1, "type": "checkbox", "x": 28, "y": 90.0, "w": 2.5, "h": 2.5 },
+  "notification.sms": { "page": 1, "type": "checkbox", "x": 46, "y": 90.0, "w": 2.5, "h": 2.5 },
+
+  /* =========================
+     2페이지 : 급여 선택 / 요금감면 / 필수동의
+     ========================= */
+
+  // 급여 종류
+  "benefit.basic.livelihood": { "page": 2, "type": "checkbox", "x": 12, "y": 10.8, "w": 2.5, "h": 2.5 },
+  "benefit.basic.medical": { "page": 2, "type": "checkbox", "x": 26, "y": 10.8, "w": 2.5, "h": 2.5 },
+  "benefit.basic.housing": { "page": 2, "type": "checkbox", "x": 40, "y": 10.8, "w": 2.5, "h": 2.5 },
+  "benefit.basic.education": { "page": 2, "type": "checkbox", "x": 12, "y": 14.5, "w": 2.5, "h": 2.5 },
+
+  // 요금감면
+  "fee_reduction.apply_all": { "page": 2, "type": "checkbox", "x": 12, "y": 80.6, "w": 2.5, "h": 2.5 },
+  "fee_reduction.electric": { "page": 2, "type": "checkbox", "x": 12, "y": 84.0, "w": 2.5, "h": 2.5 },
+  "fee_reduction.gas": { "page": 2, "type": "checkbox", "x": 32, "y": 87.2, "w": 2.5, "h": 2.5 },
+  "fee_reduction.mobile": { "page": 2, "type": "checkbox", "x": 55, "y": 84.0, "w": 2.5, "h": 2.5 },
+
+  // 개인정보 필수 동의
+  "consent.personal_info": { "page": 2, "type": "checkbox", "x": 92, "y": 103.0, "w": 2.5, "h": 2.5 },
+
+  /* =========================
+     3페이지 : 제3자 제공동의 / 선택동의 / 서명
+     ========================= */
+
+  "consent.third_party": { "page": 3, "type": "checkbox", "x": 92, "y": 12.0, "w": 2.8, "h": 2.8 },
+
+  "consent.optional.1": { "page": 3, "type": "checkbox", "x": 92, "y": 30.5, "w": 2.8, "h": 2.8 },
+  "consent.optional.2": { "page": 3, "type": "checkbox", "x": 92, "y": 36.0, "w": 2.8, "h": 2.8 },
+  "consent.optional.3": { "page": 3, "type": "checkbox", "x": 92, "y": 41.5, "w": 2.8, "h": 2.8 },
+  "consent.optional.4": { "page": 3, "type": "checkbox", "x": 92, "y": 47.0, "w": 2.8, "h": 2.8 },
+
+  "signature.date": { "page": 3, "type": "date", "x": 70, "y": 93.0, "w": 18, "h": 3.0 },
+  "signature.applicant_name": { "page": 3, "type": "text", "x": 55, "y": 96.5, "w": 20, "h": 3.0 }
+}

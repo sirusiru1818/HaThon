@@ -1,0 +1,46 @@
+{
+  // ===== 메타 =====
+  "_meta.form_name": "근로활동 및 소득신고서",              // 서식명
+  "_meta.form_code": "서식 제24호",                         // 서식번호
+
+  // ===== 수급(권)자(예시 1의 수급자 정보 사용) =====
+  "recipient.name": "홍길동",                               // 수급(권)자 성명
+  "recipient.birthdate": "1950-01-01",                      // 생년월일
+  "recipient.address": "서울시 강남구 테헤란로 123, 101동 101호", // 주소
+
+  // ===== 취업상태 유형(체크박스: 해당사항 V) =====
+  "employment.type.regular": "V",                           // 상시근로자
+  "employment.type.temporary": "",                          // 임시·일용직
+  "employment.type.self_employed": "",                      // 자영업
+  "employment.type.other": "",                              // 기타
+
+  // ===== 직장(사업장) =====
+  "workplace.name": "",                                     // 직장(사업장)명
+  "workplace.address": "",                                  // 직장(사업장)주소
+  "workplace.phone": "",                                    // 직장(사업장) 전화번호
+
+  // ===== 소득(일당제) =====
+  "income.daily.wage": "",                                  // 1일 임금(원)
+  "income.daily.avg_work_days_per_month": "",               // 월평균 근로일수(일)
+
+  // ===== 근로시간 =====
+  "work_time.day.morning.start": "",                        // 일시간(오전) 시작
+  "work_time.day.morning.end": "",                          // 일시간(오전) 종료
+  "work_time.day.morning.hours": "",                        // 일시간(오전) 총 시간
+  "work_time.day.afternoon.start": "",                      // 일시간(오후) 시작
+  "work_time.day.afternoon.end": "",                        // 일시간(오후) 종료
+  "work_time.day.afternoon.hours": "",                      // 일시간(오후) 총 시간
+  "work_time.week.days": "",                                // 주당 근로일수(일)
+  "work_time.week.total_hours": "",                         // 주 근로시간 총(시간)
+
+  // ===== 소득(월급/자영업/기타) =====
+  "income.monthly.salary": "",                              // 월 평균 총급여(원)
+  "income.self_employed.monthly": "",                       // 자영업 월 평균 총소득(원)
+  "income.other.monthly": "",                               // 기타 월 평균 총소득(원)
+  "income.other.previous_support_org": "",                  // (이전소득일 경우) 지원하는 곳
+
+  // ===== 신고/서명 =====
+  "declaration.confirmed": "V",                             // '소득이 있음을 신고' 확인(임의 체크)
+  "signature.reporter_name": "홍길동",                      // 신고자
+  "signature.date": "2024-02-10"                            // 작성일(예시 1 종료일로 임의 매핑)
+}

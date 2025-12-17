@@ -372,11 +372,9 @@ async def start_form_session(category: str, session_id: str = None):
         }
     
     return {
-        "message": f"{category} 관련 서류 작성을 시작합니다.",
+        "message": f"{category} 신청에 필요한 정보를 안내해드리겠습니다.",
         "session_id": session_id,
         "category": category,
-        "documents": list(form_state["documents"].keys()),
-        "current_document": form_state["current_document"],
         "total_fields": sum(doc["total_count"] for doc in form_state["documents"].values())
     }
 
@@ -744,7 +742,7 @@ async def voice_process(request: VoiceTextRequest):
                 # 첫 번째 폼 대화 시작 - 초기 질문 생성
                 initial_form_result = await process_form_conversation(
                     session_id=form_session_id,
-                    user_input="서류 작성을 시작합니다.",
+                    user_input="안녕하세요. 신청에 필요한 정보를 알려주세요.",
                     category=category
                 )
                 

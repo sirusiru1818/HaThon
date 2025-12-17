@@ -1,0 +1,17 @@
+{
+  // ===== 가입자 =====
+  "subscriber.name":            { "page": 1, "type": "text", "x": 18.5, "y": 26.5, "w": 26.0, "h": 3.2 }, // 성명
+  "subscriber.resident_number": { "page": 1, "type": "text", "x": 46.0, "y": 26.5, "w": 28.0, "h": 3.2 }, // 주민등록번호
+  "subscriber.phone":           { "page": 1, "type": "text", "x": 18.5, "y": 30.8, "w": 26.0, "h": 3.2 }, // 전화번호
+  "subscriber.mobile":          { "page": 1, "type": "text", "x": 46.0, "y": 30.8, "w": 28.0, "h": 3.2 }, // 휴대전화번호
+  "subscriber.address":         { "page": 1, "type": "text", "x": 18.5, "y": 35.0, "w": 55.5, "h": 4.0 }, // 주소
+
+  // ===== 신청내용 =====
+  "application.certificate_count": { "page": 1, "type": "text", "x": 25.0, "y": 44.0, "w": 10.0, "h": 3.2 }, // 발급 통수
+  "application.resident_number_display.full":      { "page": 1, "type": "checkbox", "x": 54.0, "y": 44.0, "w": 2.5, "h": 2.5 }, // 주민등록번호 출력: 전체 표기
+  "application.resident_number_display.front_only":{ "page": 1, "type": "checkbox", "x": 64.5, "y": 44.0, "w": 2.5, "h": 2.5 }, // 주민등록번호 출력: 앞자리만 표기
+
+  // ===== 날짜/서명 =====
+  "signature.date":           { "page": 1, "type": "date", "x": 30.0, "y": 56.5, "w": 24.0, "h": 3.2 }, // 년 월 일
+  "signature.applicant_name": { "page": 1, "type": "text", "x": 56.0, "y": 56.5, "w": 18.0, "h": 3.2 }  // 신청인(서명 또는 인)
+}

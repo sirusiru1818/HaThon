@@ -1,0 +1,142 @@
+{
+  /* =========================
+     공통 메타/선택
+     ========================= */
+  "_meta.contract_type.deposit_monthly": { "page": 1, "type": "checkbox", "x": 78, "y": 6.8, "w": 2.6, "h": 2.6 }, // 보증금 있는 월세
+  "_meta.contract_type.jeonse":          { "page": 1, "type": "checkbox", "x": 86, "y": 6.8, "w": 2.6, "h": 2.6 }, // 전세
+  "_meta.contract_type.monthly":         { "page": 1, "type": "checkbox", "x": 92, "y": 6.8, "w": 2.6, "h": 2.6 }, // 월세
+
+  /* =========================
+     1페이지 : 임차주택의 표시
+     ========================= */
+  "property.address.road":           { "page": 1, "type": "text", "x": 18, "y": 19.2, "w": 62, "h": 3.2 }, // 소재지(도로명주소)
+  "property.land.category":          { "page": 1, "type": "text", "x": 18, "y": 23.0, "w": 20, "h": 3.0 }, // 토지 지목
+  "property.land.area_sqm":           { "page": 1, "type": "text", "x": 58, "y": 23.0, "w": 16, "h": 3.0 }, // 토지 면적(㎡)
+  "property.building.structure_use":  { "page": 1, "type": "text", "x": 18, "y": 26.4, "w": 28, "h": 3.0 }, // 건물 구조·용도
+  "property.building.area_sqm":       { "page": 1, "type": "text", "x": 58, "y": 26.4, "w": 16, "h": 3.0 }, // 건물 면적(㎡)
+  "property.lease_part.detail":       { "page": 1, "type": "text", "x": 18, "y": 29.8, "w": 40, "h": 3.0 }, // 임차할 부분(동·층·호)
+  "property.lease_part.area_sqm":     { "page": 1, "type": "text", "x": 58, "y": 29.8, "w": 16, "h": 3.0 }, // 임차 부분 면적(㎡)
+
+  /* =========================
+     1페이지 : 계약의 종류
+     ========================= */
+  "contract.kind.new":                { "page": 1, "type": "checkbox", "x": 20, "y": 34.2, "w": 2.5, "h": 2.5 }, // 신규 계약
+  "contract.kind.renewal_agreement":  { "page": 1, "type": "checkbox", "x": 32, "y": 34.2, "w": 2.5, "h": 2.5 }, // 합의 재계약
+  "contract.kind.renewal_by_right":   { "page": 1, "type": "checkbox", "x": 20, "y": 37.4, "w": 2.5, "h": 2.5 }, // 갱신요구권 행사
+
+  "contract.previous.period.start":   { "page": 1, "type": "date", "x": 26, "y": 41.0, "w": 10, "h": 3.0 }, // 갱신 전 기간 시작
+  "contract.previous.period.end":     { "page": 1, "type": "date", "x": 38, "y": 41.0, "w": 10, "h": 3.0 }, // 갱신 전 기간 종료
+  "contract.previous.deposit":        { "page": 1, "type": "text", "x": 52, "y": 41.0, "w": 12, "h": 3.0 }, // 갱신 전 보증금
+  "contract.previous.rent_monthly":   { "page": 1, "type": "text", "x": 68, "y": 41.0, "w": 12, "h": 3.0 }, // 갱신 전 차임
+
+  /* =========================
+     1페이지 : 미납세/선순위
+     ========================= */
+  "tax_arrears.none":                 { "page": 1, "type": "checkbox", "x": 20, "y": 46.0, "w": 2.5, "h": 2.5 }, // 미납 국·지방세 없음
+  "tax_arrears.exists":               { "page": 1, "type": "checkbox", "x": 32, "y": 46.0, "w": 2.5, "h": 2.5 }, // 있음
+  "priority_fixed_date.none":         { "page": 1, "type": "checkbox", "x": 56, "y": 46.0, "w": 2.5, "h": 2.5 }, // 선순위 확정일자 없음
+  "priority_fixed_date.exists":       { "page": 1, "type": "checkbox", "x": 68, "y": 46.0, "w": 2.5, "h": 2.5 }, // 있음
+
+  /* =========================
+     1페이지 : 계약내용(보증금/차임/관리비)
+     ========================= */
+  "payment.deposit.amount":           { "page": 1, "type": "text", "x": 18, "y": 54.0, "w": 22, "h": 3.0 }, // 보증금
+  "payment.deposit.korean":           { "page": 1, "type": "text", "x": 42, "y": 54.0, "w": 30, "h": 3.0 }, // 원정
+  "payment.contract_money.amount":    { "page": 1, "type": "text", "x": 18, "y": 57.6, "w": 22, "h": 3.0 }, // 계약금
+  "payment.contract_money.receipt":   { "page": 1, "type": "checkbox", "x": 42, "y": 58.0, "w": 2.5, "h": 2.5 }, // 영수
+  "payment.contract_money.receiver":  { "page": 1, "type": "text", "x": 48, "y": 57.6, "w": 24, "h": 3.0 }, // 영수자
+  "payment.middle_money.amount":      { "page": 1, "type": "text", "x": 18, "y": 61.2, "w": 22, "h": 3.0 }, // 중도금
+  "payment.middle_money.pay_date":    { "page": 1, "type": "date", "x": 42, "y": 61.2, "w": 14, "h": 3.0 }, // 지급일
+  "payment.balance.amount":           { "page": 1, "type": "text", "x": 18, "y": 64.8, "w": 22, "h": 3.0 }, // 잔금
+  "payment.balance.pay_date":         { "page": 1, "type": "date", "x": 42, "y": 64.8, "w": 14, "h": 3.0 }, // 지급일
+  "payment.rent_monthly.amount":      { "page": 1, "type": "text", "x": 18, "y": 68.4, "w": 22, "h": 3.0 }, // 차임(월)
+  "payment.rent_monthly.pay_day":     { "page": 1, "type": "text", "x": 42, "y": 68.4, "w": 10, "h": 3.0 }, // 매월 지급일
+  "payment.rent_monthly.account":     { "page": 1, "type": "text", "x": 54, "y": 68.4, "w": 26, "h": 3.0 }, // 입금계좌
+
+  "payment.management_fee.fixed":     { "page": 1, "type": "checkbox", "x": 18, "y": 72.0, "w": 2.5, "h": 2.5 }, // 관리비 정액
+  "payment.management_fee.amount":    { "page": 1, "type": "text", "x": 22, "y": 71.6, "w": 18, "h": 3.0 }, // 금액
+  "payment.management_fee.items":     { "page": 1, "type": "text", "x": 42, "y": 71.6, "w": 38, "h": 3.0 }, // 항목/산정
+
+  /* =========================
+     1페이지 : 임대차기간/수리
+     ========================= */
+  "lease.delivery_deadline":          { "page": 1, "type": "date", "x": 38, "y": 77.2, "w": 12, "h": 3.0 }, // 인도 기한
+  "lease.period.start":               { "page": 1, "type": "date", "x": 52, "y": 77.2, "w": 12, "h": 3.0 }, // 시작
+  "lease.period.end":                 { "page": 1, "type": "date", "x": 66, "y": 77.2, "w": 12, "h": 3.0 }, // 종료
+
+  "repair.before.none":               { "page": 1, "type": "checkbox", "x": 18, "y": 82.0, "w": 2.5, "h": 2.5 }, // 수리 없음
+  "repair.before.exists":             { "page": 1, "type": "checkbox", "x": 26, "y": 82.0, "w": 2.5, "h": 2.5 }, // 수리 있음
+  "repair.before.details":            { "page": 1, "type": "text", "x": 30, "y": 81.6, "w": 50, "h": 3.0 }, // 수리 내용
+  "repair.complete.by_balance":       { "page": 1, "type": "checkbox", "x": 18, "y": 85.4, "w": 2.5, "h": 2.5 }, // 잔금기일
+  "repair.complete.other":            { "page": 1, "type": "checkbox", "x": 30, "y": 85.4, "w": 2.5, "h": 2.5 }, // 기타
+  "repair.complete.other_detail":     { "page": 1, "type": "text", "x": 34, "y": 85.0, "w": 46, "h": 3.0 }, // 기타 내용
+
+  /* =========================
+     2페이지 : 특약/동의/계획
+     ========================= */
+  "special_terms":                    { "page": 2, "type": "textarea", "x": 10, "y": 54.0, "w": 80, "h": 16 }, // 특약사항
+  "dispute_mediation.agree":           { "page": 2, "type": "checkbox", "x": 36, "y": 78.6, "w": 2.5, "h": 2.5 }, // 조정 동의
+  "dispute_mediation.disagree":        { "page": 2, "type": "checkbox", "x": 44, "y": 78.6, "w": 2.5, "h": 2.5 }, // 미동의
+  "rebuild.none":                      { "page": 2, "type": "checkbox", "x": 20, "y": 83.6, "w": 2.5, "h": 2.5 }, // 철거/재건축 없음
+  "rebuild.exists":                    { "page": 2, "type": "checkbox", "x": 30, "y": 83.6, "w": 2.5, "h": 2.5 }, // 있음
+  "rebuild.time":                      { "page": 2, "type": "text", "x": 42, "y": 83.2, "w": 18, "h": 3.0 }, // 공사시기
+  "rebuild.duration_months":           { "page": 2, "type": "text", "x": 64, "y": 83.2, "w": 10, "h": 3.0 }, // 소요기간
+  "detail_address.owner_agree":         { "page": 2, "type": "checkbox", "x": 20, "y": 88.0, "w": 2.5, "h": 2.5 }, // 상세주소 동의
+  "detail_address.owner_disagree":      { "page": 2, "type": "checkbox", "x": 30, "y": 88.0, "w": 2.5, "h": 2.5 }, // 미동의
+
+  /* =========================
+     3페이지 : 당사자/중개사 서명
+     ========================= */
+  "landlord.address":                 { "page": 3, "type": "text", "x": 12, "y": 18.0, "w": 30, "h": 3.0 },
+  "landlord.resident_number":          { "page": 3, "type": "text", "x": 44, "y": 18.0, "w": 22, "h": 3.0 },
+  "landlord.phone":                   { "page": 3, "type": "text", "x": 68, "y": 18.0, "w": 20, "h": 3.0 },
+  "landlord.name":                    { "page": 3, "type": "text", "x": 44, "y": 21.6, "w": 22, "h": 3.0 },
+  "landlord.signature":               { "page": 3, "type": "checkbox", "x": 68, "y": 21.6, "w": 3.0, "h": 3.0 },
+
+  "tenant.address":                   { "page": 3, "type": "text", "x": 12, "y": 31.0, "w": 30, "h": 3.0 },
+  "tenant.resident_number":            { "page": 3, "type": "text", "x": 44, "y": 31.0, "w": 22, "h": 3.0 },
+  "tenant.phone":                     { "page": 3, "type": "text", "x": 68, "y": 31.0, "w": 20, "h": 3.0 },
+  "tenant.name":                      { "page": 3, "type": "text", "x": 44, "y": 34.6, "w": 22, "h": 3.0 },
+  "tenant.signature":                 { "page": 3, "type": "checkbox", "x": 68, "y": 34.6, "w": 3.0, "h": 3.0 },
+
+  "broker.office_address":             { "page": 3, "type": "text", "x": 12, "y": 44.0, "w": 30, "h": 3.0 },
+  "broker.office_name":                { "page": 3, "type": "text", "x": 44, "y": 44.0, "w": 22, "h": 3.0 },
+  "broker.representative":             { "page": 3, "type": "text", "x": 68, "y": 44.0, "w": 20, "h": 3.0 },
+  "broker.registration_number":        { "page": 3, "type": "text", "x": 44, "y": 47.6, "w": 22, "h": 3.0 },
+  "broker.phone":                      { "page": 3, "type": "text", "x": 68, "y": 47.6, "w": 20, "h": 3.0 },
+  "broker.signature":                  { "page": 3, "type": "checkbox", "x": 68, "y": 51.2, "w": 3.0, "h": 3.0 },
+
+  /* =========================
+     5페이지 : 계약갱신 거절통지서(별지2)
+     ========================= */
+  "refusal.landlord.name":             { "page": 5, "type": "text", "x": 16, "y": 16.5, "w": 24, "h": 3.0 },
+  "refusal.landlord.address":          { "page": 5, "type": "text", "x": 16, "y": 20.2, "w": 24, "h": 3.0 },
+  "refusal.landlord.contact":          { "page": 5, "type": "text", "x": 16, "y": 23.8, "w": 24, "h": 3.0 },
+  "refusal.tenant.name":               { "page": 5, "type": "text", "x": 50, "y": 16.5, "w": 24, "h": 3.0 },
+  "refusal.tenant.address":            { "page": 5, "type": "text", "x": 50, "y": 20.2, "w": 24, "h": 3.0 },
+  "refusal.tenant.contact":            { "page": 5, "type": "text", "x": 50, "y": 23.8, "w": 24, "h": 3.0 },
+  "refusal.property.address":           { "page": 5, "type": "text", "x": 16, "y": 27.4, "w": 58, "h": 3.0 },
+  "refusal.lease.period":               { "page": 5, "type": "text", "x": 16, "y": 31.0, "w": 58, "h": 3.0 },
+
+  "refusal.reason.1_arrears":           { "page": 5, "type": "checkbox", "x": 16, "y": 38.8, "w": 2.5, "h": 2.5 },
+  "refusal.reason.2_fraud":             { "page": 5, "type": "checkbox", "x": 16, "y": 42.4, "w": 2.5, "h": 2.5 },
+  "refusal.reason.3_compensation":      { "page": 5, "type": "checkbox", "x": 16, "y": 46.0, "w": 2.5, "h": 2.5 },
+  "refusal.reason.3_detail":            { "page": 5, "type": "text", "x": 28, "y": 46.0, "w": 46, "h": 3.0 },
+  "refusal.reason.4_sublease":           { "page": 5, "type": "checkbox", "x": 16, "y": 49.6, "w": 2.5, "h": 2.5 },
+  "refusal.reason.5_damage":             { "page": 5, "type": "checkbox", "x": 16, "y": 53.2, "w": 2.5, "h": 2.5 },
+  "refusal.reason.6_destroyed":          { "page": 5, "type": "checkbox", "x": 16, "y": 56.8, "w": 2.5, "h": 2.5 },
+  "refusal.reason.7_rebuild":            { "page": 5, "type": "checkbox", "x": 16, "y": 60.4, "w": 2.5, "h": 2.5 },
+  "refusal.reason.7_1_plan":             { "page": 5, "type": "checkbox", "x": 22, "y": 64.0, "w": 2.5, "h": 2.5 },
+  "refusal.reason.7_2_safety":           { "page": 5, "type": "checkbox", "x": 22, "y": 67.6, "w": 2.5, "h": 2.5 },
+  "refusal.reason.7_3_law":              { "page": 5, "type": "checkbox", "x": 22, "y": 71.2, "w": 2.5, "h": 2.5 },
+  "refusal.reason.8_reside":             { "page": 5, "type": "checkbox", "x": 16, "y": 74.8, "w": 2.5, "h": 2.5 },
+  "refusal.reason.8_resident_name":      { "page": 5, "type": "text", "x": 30, "y": 74.4, "w": 20, "h": 3.0 },
+  "refusal.reason.8_relationship.self":  { "page": 5, "type": "checkbox", "x": 52, "y": 74.8, "w": 2.5, "h": 2.5 },
+  "refusal.reason.8_relationship.asc":   { "page": 5, "type": "checkbox", "x": 58, "y": 74.8, "w": 2.5, "h": 2.5 },
+  "refusal.reason.8_relationship.desc":  { "page": 5, "type": "checkbox", "x": 64, "y": 74.8, "w": 2.5, "h": 2.5 },
+  "refusal.reason.9_other":              { "page": 5, "type": "checkbox", "x": 16, "y": 78.4, "w": 2.5, "h": 2.5 },
+  "refusal.reason.detail":               { "page": 5, "type": "textarea", "x": 16, "y": 82.0, "w": 58, "h": 8 },
+
+  "refusal.date":                        { "page": 5, "type": "date", "x": 30, "y": 92.6, "w": 18, "h": 3.0 },
+  "refusal.landlord.signature":          { "page": 5, "type": "checkbox", "x": 56, "y": 92.6, "w": 3.0, "h": 3.0 }
+}

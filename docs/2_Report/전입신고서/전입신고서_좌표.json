@@ -1,0 +1,57 @@
+{
+  // ===== 상단(접수/신고일) =====
+  // 접수번호는 보통 접수처 기재(어두운 칸)라 제외하고, 신고일만 포함
+  "report.date": { "page": 1, "type": "date", "x": 71, "y": 18.6, "w": 18, "h": 3.0 }, // 신고일(년/월/일)
+
+  // ===== 전입자(신고인) =====
+  "mover.name":            { "page": 1, "type": "text", "x": 13, "y": 22.8, "w": 20, "h": 3.2 }, // 전입자 성명
+  "mover.resident_number": { "page": 1, "type": "text", "x": 35, "y": 22.8, "w": 26, "h": 3.2 }, // 주민등록번호
+  "mover.contact":         { "page": 1, "type": "text", "x": 63, "y": 22.8, "w": 23, "h": 3.2 }, // 연락처
+  "signature.applicant":   { "page": 1, "type": "text", "x": 13, "y": 26.4, "w": 20, "h": 3.0 }, // (서명 또는 인) - 전입자 서명란
+
+  // ===== 전에 살던 곳 =====
+  "previous_address.si_do":     { "page": 1, "type": "text", "x": 18, "y": 30.3, "w": 16, "h": 3.2 }, // 전(이전)주소 시·도
+  "previous_address.si_gun_gu": { "page": 1, "type": "text", "x": 36, "y": 30.3, "w": 24, "h": 3.2 }, // 전(이전)주소 시·군·구
+  "previous_address.detail":    { "page": 1, "type": "text", "x": 62, "y": 30.3, "w": 24, "h": 3.2 }, // 전(이전) 상세주소(참고용)
+
+  // ===== 현재 사는 곳(이사한 곳) =====
+  "current_household.head_name":    { "page": 1, "type": "text", "x": 23, "y": 34.6, "w": 28, "h": 3.2 }, // 세대주 성명
+  "current_household.head_contact": { "page": 1, "type": "text", "x": 63, "y": 34.6, "w": 23, "h": 3.2 }, // 연락처
+  "current_household.head_sign":    { "page": 1, "type": "text", "x": 23, "y": 38.1, "w": 28, "h": 3.0 }, // (서명 또는 인) - 세대주 서명란
+  "current_address.full":           { "page": 1, "type": "text", "x": 23, "y": 41.5, "w": 63, "h": 3.6 }, // 주소(현재)
+
+  // ===== 다가구주택(해당 시) =====
+  "multi_unit_house.name":  { "page": 1, "type": "text", "x": 23, "y": 45.3, "w": 39, "h": 3.2 }, // 다가구주택 명칭
+  "multi_unit_house.dong":  { "page": 1, "type": "text", "x": 23, "y": 48.9, "w": 15, "h": 3.2 }, // 동
+  "multi_unit_house.floor": { "page": 1, "type": "text", "x": 40, "y": 48.9, "w": 15, "h": 3.2 }, // 층
+  "multi_unit_house.ho":    { "page": 1, "type": "text", "x": 57, "y": 48.9, "w": 15, "h": 3.2 }, // 호
+
+  // ===== 전입 사유(※주된 1가지) 체크박스 =====
+  "move_reason.job":                 { "page": 1, "type": "checkbox", "x": 20.0, "y": 53.3, "w": 2.8, "h": 2.8 }, // 직업(취업/사업/전근 등)
+  "move_reason.family":              { "page": 1, "type": "checkbox", "x": 20.0, "y": 55.8, "w": 2.8, "h": 2.8 }, // 가족(동거/결혼/분가 등)
+  "move_reason.housing":             { "page": 1, "type": "checkbox", "x": 20.0, "y": 58.3, "w": 2.8, "h": 2.8 }, // 주거(주택구입/전월세/하숙 등)
+  "move_reason.education":           { "page": 1, "type": "checkbox", "x": 52.5, "y": 53.3, "w": 2.8, "h": 2.8 }, // 교육(진학/학업 등)
+  "move_reason.housing_environment": { "page": 1, "type": "checkbox", "x": 52.5, "y": 55.8, "w": 2.8, "h": 2.8 }, // 주택환경(편의시설 등)
+  "move_reason.natural_environment": { "page": 1, "type": "checkbox", "x": 52.5, "y": 58.3, "w": 2.8, "h": 2.8 }, // 자연환경(건강/공해 등)
+  "move_reason.other":               { "page": 1, "type": "checkbox", "x": 52.5, "y": 60.8, "w": 2.8, "h": 2.8 }, // 그 밖의 사유
+
+  // ===== 우편물 전입지 전송 서비스 신청(하단 박스) =====
+  "mail_forwarding.apply":    { "page": 1, "type": "checkbox", "x": 12.5, "y": 90.2, "w": 2.8, "h": 2.8 }, // 서비스 신청
+  "mail_forwarding.not_apply":{ "page": 1, "type": "checkbox", "x": 12.5, "y": 93.0, "w": 2.8, "h": 2.8 }, // 서비스 미신청
+
+  // 대리인 신청(있을 때만)
+  "mail_forwarding.agent.name":          { "page": 1, "type": "text", "x": 46.5, "y": 90.0, "w": 16.5, "h": 3.0 }, // (대리인 성명)
+  "mail_forwarding.agent.relationship":  { "page": 1, "type": "text", "x": 65.0, "y": 90.0, "w": 10.0, "h": 3.0 }, // (대리인 관계)
+  "mail_forwarding.agent.resident_number":{ "page": 1, "type": "text", "x": 76.0, "y": 90.0, "w": 12.0, "h": 3.0 }, // (대리인 주민번호 일부)
+
+  // 신청인 연락처
+  "mail_forwarding.contact.phone":  { "page": 1, "type": "text", "x": 32.0, "y": 93.0, "w": 20.0, "h": 3.0 }, // 연락처(전화)
+  "mail_forwarding.contact.mobile": { "page": 1, "type": "text", "x": 54.0, "y": 93.0, "w": 20.0, "h": 3.0 }, // 연락처(휴대전화)
+
+  // 개인정보 제공 동의 체크(문구 아래 체크)
+  "mail_forwarding.consent.info_provide": { "page": 1, "type": "checkbox", "x": 12.5, "y": 96.0, "w": 2.8, "h": 2.8 }, // 정보 제공 동의
+
+  // 신청인(서명 또는 인)
+  "signature.date": { "page": 1, "type": "date", "x": 70.0, "y": 96.0, "w": 12.0, "h": 3.0 }, // (우편물 서비스 박스) 신청일
+  "signature.name": { "page": 1, "type": "text", "x": 83.0, "y": 96.0, "w": 13.0, "h": 3.0 }  // 신청인(서명 또는 인)
+}
