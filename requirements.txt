@@ -7,3 +7,14 @@ langchain<1.0.0
 langgraph
 langchain_aws
 pillow
+
+# PDF 생성
+reportlab
+pypdf
+
+# AWS 서비스
+boto3
+
+# 음성 인식 (선택적 - 서버 측 STT 사용 시 필요)
+# pyaudio
+# amazon-transcribe-streaming-sdk

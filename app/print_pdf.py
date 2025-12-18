@@ -31,15 +31,39 @@ class PdfGenerator:
         self.template_path = template_path
         self.font_name = 'CustomFont'
         
-        # 1. 폰트 파일 존재 여부 확인
-        if not os.path.exists(font_path):
-            raise FileNotFoundError(f"폰트 파일을 찾을 수 없습니다: {font_path}")
+        # 1. 폰트 파일 찾기 (여러 경로 시도)
+        font_paths_to_try = [
+            font_path,  # 지정된 경로
+            '/System/Library/Fonts/Supplemental/AppleGothic.ttf',  # macOS 시스템 폰트
+            '/Library/Fonts/AppleGothic.ttf',  # macOS 폰트
+            '/System/Library/Fonts/AppleSDGothicNeo.ttc',  # macOS 최신 폰트
+            '/usr/share/fonts/truetype/nanum/NanumGothic.ttf',  # Linux 폰트
+        ]
+        
+        actual_font_path = None
+        for try_path in font_paths_to_try:
+            if os.path.exists(try_path):
+                actual_font_path = try_path
+                print(f"[PDF] 폰트 발견: {try_path}")
+                break
+        
+        if not actual_font_path:
+            print(f"[PDF] ⚠️ 한글 폰트를 찾을 수 없습니다. 기본 폰트(Helvetica)를 사용합니다.")
+            print(f"[PDF]    시도한 경로: {font_paths_to_try}")
+            self.font_name = 'Helvetica'  # 기본 폰트 사용 (한글 깨짐 가능)
+            return
         
         # 2. 폰트 등록 (이미 등록돼있으면 건너뛰기)
         try:
             pdfmetrics.getFont(self.font_name)
-        except:
-            pdfmetrics.registerFont(TTFont(self.font_name, font_path))
+            print(f"[PDF] 폰트 '{self.font_name}'은 이미 등록되어 있습니다.")
+        except KeyError:
+            try:
+                pdfmetrics.registerFont(TTFont(self.font_name, actual_font_path))
+                print(f"[PDF] 폰트 '{self.font_name}' 등록 완료: {actual_font_path}")
+            except Exception as e:
+                print(f"[PDF] ❌ 폰트 등록 실패: {e}")
+                self.font_name = 'Helvetica'  # 폴백
 
     def _create_overlay(self, data, coords, debug=False, invert_y=True):
         """
@@ -256,24 +280,24 @@ def main():
     category_1 = "4_Monthly"
     doc_name_1 = "위임장"
     data_1 = {
-        # 위임하는 사람
-        "delegator.name": "홍길동",
-        "delegator.birthdate": "1990-01-01",
-        "delegator.address": "서울특별시 강남구 테헤란로 123",
-        "delegator.number": "010-1234-5678",
+                # 위임하는 사람
+                "delegator.name": "홍길동",
+                "delegator.birthdate": "1990-01-01",
+                "delegator.address": "서울특별시 강남구 테헤란로 123",
+                "delegator.number": "010-1234-5678",
 
-        # 위임받는 사람
-        "delegate.name": "김철수",
-        "delegate.birthdate": "1995-05-12",
-        "delegate.relationship_to_delegator": "친구",
-        "delegate.number": "010-9876-5432",
-        "delegate.address": "서울특별시 마포구 월드컵북로 45",
+                # 위임받는 사람
+                "delegate.name": "김철수",
+                "delegate.birthdate": "1995-05-12",
+                "delegate.relationship_to_delegator": "친구",
+                "delegate.number": "010-9876-5432",
+                "delegate.address": "서울특별시 마포구 월드컵북로 45",
 
-        # 민원내용 체크박스
+                # 민원내용 체크박스
         "civil_service_items.rent_request": "V",
-        "civil_service_items.appeal_request": "",
-        "civil_service_items.certificate_issuance": ""
-    }
+                "civil_service_items.appeal_request": "",
+                "civil_service_items.certificate_issuance": ""
+            }
     
     try:
         filename = os.path.join(output_dir, "result_위임장.pdf")

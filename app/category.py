@@ -438,14 +438,23 @@ async def delete_form_session(session_id: str):
     """
     폼 세션을 종료하고 삭제합니다.
     """
+    # close_form_session이 세션을 삭제하기 전에 데이터를 반환하므로
+    # 반환값을 바로 사용
     result = close_form_session(session_id)
     
     if not result:
         return {"error": "세션을 찾을 수 없습니다."}
     
+    # result에 이미 최종 데이터가 포함되어 있음
     return {
         "message": "세션이 종료되었습니다.",
-        "final_data": get_filled_form(session_id)
+        "final_data": {
+            "category": result.get("category"),
+            "documents": {
+                doc_name: doc["fields"]
+                for doc_name, doc in result.get("documents", {}).items()
+            }
+        }
     }
 
 

@@ -12,6 +12,7 @@ from enum import Enum
 from langchain_aws import ChatBedrockConverse
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 from langchain_core.chat_history import BaseChatMessageHistory, InMemoryChatMessageHistory
+from langchain_core.messages import AIMessage, HumanMessage
 from langchain_core.runnables.history import RunnableWithMessageHistory
 from dotenv import load_dotenv
 
@@ -371,7 +372,16 @@ def get_chat_history(session_id: str) -> BaseChatMessageHistory:
     """세션 ID에 해당하는 대화 히스토리를 반환하거나 새로 생성"""
     if session_id not in chat_history_store:
         chat_history_store[session_id] = InMemoryChatMessageHistory()
-    return chat_history_store[session_id]
+    
+    # 히스토리가 너무 길어지면 최근 6개만 유지 (3턴 = 사용자3 + AI3)
+    # 너무 긴 히스토리는 LLM이 이전 질문을 참고해서 중복 질문하게 만듦
+    history = chat_history_store[session_id]
+    if len(history.messages) > 6:
+        # 최근 6개 메시지만 유지
+        history.messages = history.messages[-6:]
+        print(f"[CHAT_HISTORY] 히스토리 정리: 최근 6개만 유지")
+    
+    return history
 
 
 def init_form_session(session_id: str, category: str) -> Dict[str, Any]:
@@ -429,6 +439,11 @@ def update_form_field(session_id: str, document_name: str, field_name: str, valu
         doc["fields"][field_name] = value
         
         # 채워진 필드 수 업데이트
+        # ⚠️ 주의: 빈 문자열("")도 "채워진 값"으로 간주 (체크박스 필드에서 "체크하지 않음"을 의미)
+        # 하지만 unfilled 판단은 별도 로직에서 처리 (get_unfilled_fields에서 빈 문자열 제외하지 않음)
+        # 따라서 filled_count는 업데이트하지만, unfilled 목록에는 포함되지 않도록 get_unfilled_fields를 수정해야 함
+        
+        # 기존 로직 유지: 빈 문자열도 값으로 간주
         if old_value == "" and value != "":
             doc["filled_count"] += 1
         elif old_value != "" and value == "":
@@ -437,6 +452,10 @@ def update_form_field(session_id: str, document_name: str, field_name: str, valu
         # 🔥 공통 필드 자동 채우기
         # 현재 필드와 같은 그룹의 필드들을 찾아서 자동으로 채움
         auto_fill_common_fields(session_id, field_name, value)
+        
+        # 📅 날짜 기간 자동 계산
+        # 시작/종료 년월이 모두 채워지면 자동으로 기간을 계산
+        auto_calculate_period(session_id, document_name, field_name)
         
         return True
     
@@ -495,15 +514,134 @@ def auto_fill_common_fields(session_id: str, source_field: str, value: str):
                 print(f"[AUTO_FILL] ✅ {doc_name}.{field} = {value}")
 
 
+def auto_calculate_period(session_id: str, document_name: str, field_name: str):
+    """
+    날짜 기간 자동 계산: 시작/종료 년월이 모두 채워지면 자동으로 기간을 계산
+    
+    예시:
+    - receive_period.start_year: 2024
+    - receive_period.start_month: 01
+    - receive_period.end_year: 2024
+    - receive_period.end_month: 03
+    → receive_period.total_months: 2 (자동 계산)
+    """
+    session = form_session_store.get(session_id)
+    if not session:
+        return
+    
+    doc = session["documents"].get(document_name)
+    if not doc:
+        return
+    
+    # 날짜 필드가 업데이트되었는지 확인
+    date_field_patterns = [
+        "start_year", "start_month", "end_year", "end_month",
+        "start_date", "end_date"
+    ]
+    
+    if not any(pattern in field_name for pattern in date_field_patterns):
+        return  # 날짜 관련 필드가 아니면 무시
+    
+    # 필드 이름에서 prefix 추출 (예: "receive_period.start_year" → "receive_period")
+    if "." in field_name:
+        prefix = field_name.rsplit(".", 1)[0]
+    else:
+        return
+    
+    # 시작/종료 년월 필드 확인
+    start_year_field = f"{prefix}.start_year"
+    start_month_field = f"{prefix}.start_month"
+    end_year_field = f"{prefix}.end_year"
+    end_month_field = f"{prefix}.end_month"
+    total_months_field = f"{prefix}.total_months"
+    
+    # 모든 필드가 존재하는지 확인
+    if not all(field in doc["fields"] for field in [
+        start_year_field, start_month_field, end_year_field, end_month_field, total_months_field
+    ]):
+        return  # 필요한 필드가 없으면 무시
+    
+    # 시작/종료 년월 값 가져오기
+    start_year = doc["fields"][start_year_field]
+    start_month = doc["fields"][start_month_field]
+    end_year = doc["fields"][end_year_field]
+    end_month = doc["fields"][end_month_field]
+    
+    # 모든 값이 채워져 있는지 확인
+    if not all([start_year, start_month, end_year, end_month]):
+        return  # 값이 하나라도 없으면 계산 불가
+    
+    try:
+        # 문자열을 정수로 변환
+        start_year = int(start_year)
+        start_month = int(start_month)
+        end_year = int(end_year)
+        end_month = int(end_month)
+        
+        # 개월 수 계산
+        total_months = (end_year - start_year) * 12 + (end_month - start_month)
+        
+        # 기간이 음수면 0으로 설정
+        if total_months < 0:
+            total_months = 0
+        
+        # total_months 필드 자동 채우기
+        old_value = doc["fields"][total_months_field]
+        doc["fields"][total_months_field] = str(total_months)
+        
+        # 채워진 필드 수 업데이트 (이전에 비어있었다면)
+        if not old_value or old_value == "":
+            doc["filled_count"] += 1
+        
+        print(f"[AUTO_CALC] 📅 기간 자동 계산: {start_year}.{start_month:02d} ~ {end_year}.{end_month:02d} = {total_months}개월")
+        print(f"[AUTO_CALC] ✅ {document_name}.{total_months_field} = {total_months}")
+        
+    except (ValueError, TypeError) as e:
+        print(f"[AUTO_CALC] ❌ 기간 계산 실패: {e}")
+        return
+
+
 def get_unfilled_fields(session_id: str, document_name: str = None) -> List[Dict[str, str]]:
     """
     아직 채워지지 않은 필드 목록을 반환합니다.
+    자동 계산 필드는 제외됩니다.
+    공통 필드 그룹을 고려하여 같은 의미의 필드는 하나만 반환합니다.
     """
     session = form_session_store.get(session_id)
     if not session:
         return []
     
+    # 자동 계산되는 필드 패턴 (사용자에게 묻지 않음)
+    auto_calculated_patterns = [
+        "total_months",  # 수령 기간 (개월 수)
+        "period",        # 기간
+        "duration",      # 기간
+        "total_days",    # 총 일수
+    ]
+    
+    category = session.get("category")
+    category_groups = COMMON_FIELD_GROUPS_BY_CATEGORY.get(category, []) if category else []
+    
+    # 공통 필드 그룹에서 이미 채워진 필드 추적
+    filled_groups = set()  # 이미 채워진 그룹의 인덱스
+    group_field_map = {}  # 그룹 인덱스 -> 해당 그룹의 필드들
+    
+    # 공통 필드 그룹 매핑 생성
+    for group_idx, group in enumerate(category_groups):
+        group_field_map[group_idx] = group
+        # 그룹 내 필드 중 하나라도 채워져 있으면 해당 그룹은 제외
+        for field in group:
+            for doc_name, doc_data in session["documents"].items():
+                if field in doc_data["fields"]:
+                    field_value = doc_data["fields"][field]
+                    if field_value and field_value != "" and field_value != "N/A":
+                        filled_groups.add(group_idx)
+                        break
+                if group_idx in filled_groups:
+                    break
+    
     unfilled = []
+    processed_common_fields = set()  # 이미 처리된 공통 필드 그룹
     
     docs_to_check = [document_name] if document_name else session["documents"].keys()
     
@@ -513,12 +651,41 @@ def get_unfilled_fields(session_id: str, document_name: str = None) -> List[Dict
             continue
             
         for field_name, value in doc["fields"].items():
+            # 자동 계산 필드는 제외
+            if any(pattern in field_name for pattern in auto_calculated_patterns):
+                continue
+            
             if value == "":
-                unfilled.append({
-                    "document": doc_name,
-                    "field": field_name,
-                    "description": doc["descriptions"].get(field_name, field_name)
-                })
+                # 공통 필드 그룹에 속하는지 확인
+                is_common_field = False
+                found_group_idx = None
+                for group_idx, group in enumerate(category_groups):
+                    if field_name in group:
+                        is_common_field = True
+                        found_group_idx = group_idx
+                        # 이미 채워진 그룹이면 제외
+                        if group_idx in filled_groups:
+                            break
+                        # 같은 그룹의 필드가 이미 처리되었으면 제외 (하나만 반환)
+                        if group_idx in processed_common_fields:
+                            break
+                        # 첫 번째로 발견된 그룹의 필드만 추가
+                        processed_common_fields.add(group_idx)
+                        # 공통 필드 그룹의 첫 번째 필드로 추가
+                        unfilled.append({
+                            "document": doc_name,
+                            "field": field_name,
+                            "description": doc["descriptions"].get(field_name, field_name)
+                        })
+                        break
+                
+                # 공통 필드가 아닌 경우 (공통 필드 그룹에 속하지 않음)
+                if not is_common_field:
+                    unfilled.append({
+                        "document": doc_name,
+                        "field": field_name,
+                        "description": doc["descriptions"].get(field_name, field_name)
+                    })
     
     return unfilled
 
@@ -534,82 +701,52 @@ def close_form_session(session_id: str) -> Optional[Dict[str, Any]]:
 
 # 폼 작성 유도 프롬프트
 form_filling_prompt = ChatPromptTemplate.from_messages([
-    ("system", """당신은 행정복지센터 키오스크 상담원입니다.
-사용자가 {category} 신청에 필요한 정보를 제공하도록 자연스럽게 대화하며 도와주고 있습니다.
+    ("system", """반드시 한국어로만 응답하세요. 중국어, 한자, 영어 사용 금지.
 
-✅✅✅ 이미 수집한 정보 (절대 다시 묻지 마세요!):
+당신은 {category} 신청을 도와주는 상담원입니다.
+
+[방금 사용자가 입력한 정보]
+{just_extracted}
+
+[이미 수집 완료 - 다시 묻지 마세요]
 {filled_info}
 
-❓❓❓ 아직 필요한 정보들 (이것만 물어보세요):
+[아직 필요한 정보 - 첫 번째만 질문하세요]
 {unfilled_fields}
 
-🚨🚨🚨 생명처럼 중요한 규칙 - 위반 시 시스템 오작동! 🚨🚨🚨
-
-【규칙 1】 응답 형식 - 반드시 질문으로 끝내기!
-   ✅ 좋은 예: "성함이 어떻게 되시나요?"
-   ✅ 좋은 예: "생년월일을 알려주시겠어요?"
-   ❌ 나쁜 예: "감사합니다." (질문이 아님!)
-   ❌ 나쁜 예: "알겠습니다. 다음으로 넘어가겠습니다." (질문이 아님!)
-   
-   → 항상 물음표(?)로 끝나야 합니다!
-   → 진술이나 감사 인사로 끝내지 마세요!
-
-【규칙 2】 이미 수집한 정보 절대 다시 묻지 않기!
-   - 위의 "✅✅✅ 이미 수집한 정보" 목록에 있는 것은 절대 다시 묻지 마세요
-   - 예: 이름이 이미 목록에 있으면 "성함이 어떻게 되시나요?" 절대 금지!
-   - 오직 "❓❓❓ 아직 필요한 정보들"에 있는 것만 물어보세요
-
-【규칙 3】 완료 판단 금지 - 당신은 완료를 판단하지 않습니다!
-   ❌ 절대 사용 금지 표현:
-   - "작성 완료", "완료되었습니다", "끝났습니다"
-   - "모든 정보가 입력", "다 되었습니다", "감사합니다"
-   - "마무리되었습니다", "수고하셨습니다"
-   
-   ✅ 올바른 행동:
-   - "❓❓❓ 아직 필요한 정보들"에 항목이 있으면 계속 질문
-   - 시스템이 자동으로 완료 여부를 판단합니다
-   - 당신은 그냥 계속 정보를 수집하세요
-
-【규칙 4】 서류 이름/문서 전환 언급 금지
-   ❌ 금지: "위임장", "대리수령", "신청서", "다음 서류로..."
-   ✅ 허용: 그냥 자연스럽게 다음 정보 물어보기
-
-【규칙 5】 한 번에 1개 정보만 물어보기
-   ✅ 좋은 예: "연락처는 어떻게 되시나요?"
-   ❌ 나쁜 예: "연락처와 주소를 알려주세요." (한 번에 2개)
-
-🎯 응답 템플릿 (반드시 따르세요):
-1. 사용자 답변 확인 (선택): "네, 알겠습니다."
-2. 다음 질문 (필수): "[필요한 정보]는 어떻게 되시나요?"
-3. 물음표(?) 확인 (필수): 반드시 ?로 끝나야 함!
-
-예시:
-- "네, 알겠습니다. 생년월일을 알려주시겠어요?"
-- "감사합니다. 현재 거주하시는 주소는 어떻게 되시나요?"
-- "연락처는 어떻게 되시나요?"
-"""),
+규칙:
+1. 반드시 한국어만 사용하세요.
+2. "이미 수집 완료" 목록에 있는 정보는 절대 다시 묻지 마세요.
+3. "아직 필요한 정보" 목록의 첫 번째 항목만 질문하세요.
+4. 응답 형식: "네, OOO 확인했습니다. OOO는 어떻게 되시나요?"
+5. 반드시 물음표(?)로 끝나는 질문을 하세요.
+6. 한 번에 1개 정보만 물어보세요.
+7. "완료", "감사합니다", "끝" 같은 말 하지 마세요.
+8. "위와 같음", "상동", "동일" 같은 표현 사용 금지.
+9. 사용자에게 "필요한 게 있나요?" 묻지 마세요. 당신이 직접 질문하세요."""),
     MessagesPlaceholder(variable_name="history"),
     ("human", "{user_input}")
 ])
 
 # 정보 추출 프롬프트
 extraction_prompt = ChatPromptTemplate.from_messages([
-    ("system", """사용자의 응답에서 다음 필드들에 해당하는 정보를 추출하세요.
-추출할 필드 목록:
+    ("system", """사용자 응답에서 정보를 추출하세요.
+
+추출 대상 필드:
 {target_fields}
 
-추출 규칙:
-1. 사용자가 명시적으로 언급한 정보만 추출하세요.
-2. 추측하지 마세요.
-3. 날짜는 "YYYY-MM-DD" 형식으로 변환하세요.
-4. 전화번호는 "010-XXXX-XXXX" 또는 "02-XXX-XXXX" 형식으로 변환하세요.
-5. 체크박스 필드는 해당되면 "V", 아니면 빈 문자열로 표시하세요.
+규칙:
+1. 사용자가 직접 말한 정보만 추출하세요. 추측 금지.
+2. 날짜: YYYY-MM-DD 형식
+3. 전화번호: 010-XXXX-XXXX 형식
+4. 긍정 답변(네, 예, 원해요): "V"
+5. 부정 답변(아니오, 필요없어): "N/A"
+6. "위와 같음", "상동", "동일"은 유효한 값이 아닙니다. 무시하세요.
 
-JSON 형식으로만 응답하세요. 추출된 필드만 포함하세요.
-예시: {{"field.name": "홍길동", "field.birthdate": "1990-01-15"}}
-추출할 정보가 없으면 빈 객체를 반환하세요: {{}}
-"""),
-    ("human", "사용자 응답: {user_response}")
+JSON만 반환하세요.
+예: {{"delegator.name": "홍길동", "delegator.address": "서울시 강남구"}}
+추출할 정보 없으면: {{}}"""),
+    ("human", "사용자: {user_response}\n질문: {last_question}")
 ])
 
 
@@ -668,6 +805,35 @@ async def process_form_conversation(
             "completed": False
         }
     
+    # 최종 확인 단계에서 사용자가 수정을 원하는 경우 처리
+    if session.get("final_confirmation_shown") and not session.get("completed"):
+        # 사용자가 부정적인 답변을 한 경우 또는 확인 요청한 경우 수정 모드로 전환
+        negative_keywords = ["아니", "아뇨", "아니요", "싫어", "수정", "바꿔", "고쳐", "틀렸", "잘못", "보여줘", "보여줘", "확인", "다시", "보기", "체크"]
+        if any(keyword in user_input for keyword in negative_keywords):
+            # 수정 모드 활성화
+            session["final_confirmation_shown"] = False  # 최종 확인 플래그 초기화
+            print(f"[TALK_TO_FILL] 🔄 수정 모드 진입 - 사용자가 변경 요청")
+            
+            return {
+                "response": "알겠습니다! 어떤 정보를 수정하시겠어요? 수정하실 내용을 말씀해주세요.",
+                "extracted_fields": {},
+                "form_state": {
+                    "category": session["category"],
+                    "current_document": session["current_document"],
+                    "documents": {
+                        doc_name: {
+                            "filled_count": doc["filled_count"],
+                            "total_count": doc["total_count"],
+                            "fields": doc["fields"]
+                        }
+                        for doc_name, doc in session["documents"].items()
+                    }
+                },
+                "unfilled_count": 0,
+                "completed": False,
+                "edit_mode": True
+            }
+    
     # 현재 문서와 채워지지 않은 필드 가져오기
     current_doc = session["current_document"]
     unfilled = get_unfilled_fields(session_id, current_doc)
@@ -684,15 +850,34 @@ async def process_form_conversation(
             for f in unfilled[:5]  # 최대 5개 필드만 대상
         ])
         
+        # 이전 질문 가져오기 (대화 히스토리에서 마지막 AI 메시지)
+        history = get_chat_history(session_id)
+        last_question = ""
+        if history.messages and len(history.messages) > 0:
+            # 히스토리 순서: [HumanMessage1, AIMessage1, HumanMessage2, AIMessage2, ...]
+            # 가장 최신 AI 메시지를 찾기 위해 역순으로 순회
+            # 또는 인덱스로 직접 접근: 마지막이 HumanMessage면 -2, AIMessage면 -1
+            # 안전하게 역순 순회로 처리
+            for i in range(len(history.messages) - 1, -1, -1):
+                msg = history.messages[i]
+                if isinstance(msg, AIMessage):
+                    last_question = msg.content if hasattr(msg, 'content') else str(msg)
+                    print(f"[TALK_TO_FILL] 최신 AI 질문 찾음 (인덱스 {i}): {last_question[:50]}...")
+                    break
+        
         extraction_chain = extraction_prompt | llm
         
         try:
             print(f"[TALK_TO_FILL] 정보 추출 시작...")
             print(f"[TALK_TO_FILL] 대상 필드들: {[f['field'] for f in unfilled[:5]]}")
+            print(f"[TALK_TO_FILL] 현재 사용자 입력: {user_input[:100] if user_input else '(없음)'}")
+            print(f"[TALK_TO_FILL] 이전 AI 질문: {last_question[:100] if last_question else '(없음)'}")
+            print(f"[TALK_TO_FILL] 히스토리 메시지 수: {len(history.messages) if history.messages else 0}")
             
             extraction_response = extraction_chain.invoke({
                 "target_fields": target_fields_str,
-                "user_response": user_input
+                "user_response": user_input,  # 현재 턴의 사용자 입력 (함수 파라미터)
+                "last_question": last_question if last_question else "처음 질문"
             })
             
             # 응답에서 JSON 추출
@@ -713,9 +898,26 @@ async def process_form_conversation(
             extracted = {}
         
         # 추출된 정보로 폼 업데이트
+        # 빈 문자열("")도 유효한 값 (체크박스 필드에서 "체크하지 않음"을 의미)
+        print(f"[TALK_TO_FILL] 📝 필드 업데이트 시작 - 추출된 필드 수: {len(extracted)}")
         for field_name, value in extracted.items():
-            if value:
-                update_form_field(session_id, current_doc, field_name, value)
+            if value is not None:  # None이 아니면 업데이트 (빈 문자열 포함)
+                # 먼저 현재 문서에서 시도
+                success = update_form_field(session_id, current_doc, field_name, value)
+                if success:
+                    print(f"[TALK_TO_FILL] ✅ 필드 업데이트 성공: {current_doc}.{field_name} = {value}")
+                else:
+                    # 현재 문서에 없으면 다른 모든 문서에서 찾아서 업데이트
+                    found = False
+                    for doc_name in session["documents"].keys():
+                        if doc_name != current_doc:
+                            success = update_form_field(session_id, doc_name, field_name, value)
+                            if success:
+                                print(f"[TALK_TO_FILL] ✅ 필드 업데이트 성공 (다른 문서): {doc_name}.{field_name} = {value}")
+                                found = True
+                                break
+                    if not found:
+                        print(f"[TALK_TO_FILL] ⚠️ 필드를 찾을 수 없음: {field_name}")
         
         # 사용자가 "필요없음", "해당없음" 등을 말하면 현재 질문한 필드들을 건너뛰기
         skip_keywords = ["필요없", "해당없", "해당 없", "모르겠", "없어", "아니", "건너뛰", "스킵"]
@@ -754,29 +956,83 @@ async def process_form_conversation(
             for f in unfilled[:5]
         ])
     else:
-        # 완료된 경우: 빈 응답 생성하지 않고 바로 종료 메시지 반환
-        return {
-            "response": "감사합니다. 모든 정보가 입력되었습니다.",
-            "extracted_fields": {},
-            "form_state": {
-                "category": session["category"],
-                "current_document": current_doc,
-                "documents": {
-                    doc_name: {
-                        "filled_count": doc["filled_count"],
-                        "total_count": doc["total_count"],
-                        "fields": doc["fields"]
+        # 모든 필드가 채워진 경우 → 최종 확인 단계
+        
+        # 최종 확인이 이미 표시되었는지 체크
+        if not session.get("final_confirmation_shown"):
+            # 첫 번째: 입력된 정보 요약 제공 + 최종 확인 요청
+            session["final_confirmation_shown"] = True
+            
+            # 입력된 정보 요약 생성 (주요 정보만)
+            summary_items = []
+            for doc_name, doc_data in session["documents"].items():
+                for field_name, field_value in list(doc_data["fields"].items())[:10]:  # 처음 10개만
+                    if field_value and field_value != "" and field_value != "N/A":
+                        field_desc = doc_data["descriptions"].get(field_name, field_name)
+                        # 긴 값은 축약
+                        display_value = field_value[:30] + "..." if len(field_value) > 30 else field_value
+                        summary_items.append(f"• {field_desc}: {display_value}")
+            
+            summary_text = "\n".join(summary_items[:8])  # 최대 8개 항목만 표시
+            more_count = len(summary_items) - 8
+            if more_count > 0:
+                summary_text += f"\n... 외 {more_count}개 항목"
+            
+            confirmation_message = (
+                f"모든 정보가 입력되었습니다! 📝\n\n"
+                f"입력하신 주요 내용:\n{summary_text}\n\n"
+                f"이대로 제출하시겠습니까?"
+            )
+            
+            print(f"[TALK_TO_FILL] 📋 최종 확인 단계 - 요약 표시")
+            
+            return {
+                "response": confirmation_message,
+                "extracted_fields": {},
+                "form_state": {
+                    "category": session["category"],
+                    "current_document": current_doc,
+                    "documents": {
+                        doc_name: {
+                            "filled_count": doc["filled_count"],
+                            "total_count": doc["total_count"],
+                            "fields": doc["fields"]
+                        }
+                        for doc_name, doc in session["documents"].items()
                     }
-                    for doc_name, doc in session["documents"].items()
-                }
-            },
-            "unfilled_count": 0,
-            "completed": True
-        }
+                },
+                "unfilled_count": 0,
+                "completed": False,  # 아직 확인 중이므로 False
+                "awaiting_confirmation": True  # 최종 확인 대기 중
+            }
+        else:
+            # 두 번째: 사용자가 확인 후 제출
+            session["completed"] = True
+            print(f"[TALK_TO_FILL] ✅ 사용자 확인 완료 - 제출 처리")
+            
+            return {
+                "response": "감사합니다. 제출이 완료되었습니다!",
+                "extracted_fields": {},
+                "form_state": {
+                    "category": session["category"],
+                    "current_document": current_doc,
+                    "documents": {
+                        doc_name: {
+                            "filled_count": doc["filled_count"],
+                            "total_count": doc["total_count"],
+                            "fields": doc["fields"]
+                        }
+                        for doc_name, doc in session["documents"].items()
+                    }
+                },
+                "unfilled_count": 0,
+                "completed": True
+            }
     
     # 이미 채워진 정보 수집 (LLM이 중복 질문하지 않도록)
     filled_info_list = []
     filled_field_descriptions = []  # 필드 설명만 저장 (검증용)
+    filled_field_keywords = []  # 검증용 키워드 (더 포괄적)
     
     for doc_name, doc_data in session["documents"].items():
         for field_name, field_value in doc_data["fields"].items():
@@ -785,12 +1041,45 @@ async def process_form_conversation(
                 field_desc = doc_data["descriptions"].get(field_name, field_name)
                 filled_info_list.append(f"- {field_desc}: {field_value}")
                 filled_field_descriptions.append(field_desc)
+                
+                # 검증용 키워드 추출 (더 포괄적인 매칭을 위해)
+                # "위임하는 사람 이름" → ["이름", "성함", "성명"]
+                keywords = [field_desc]
+                if "이름" in field_desc:
+                    keywords.extend(["이름", "성함", "성명"])
+                if "생년월일" in field_desc:
+                    keywords.extend(["생년월일", "생일", "출생"])
+                if "주소" in field_desc:
+                    keywords.extend(["주소", "거주지", "사는 곳"])
+                if "전화" in field_desc or "번호" in field_desc:
+                    keywords.extend(["전화", "연락처", "번호", "핸드폰", "휴대폰"])
+                if "관계" in field_desc:
+                    keywords.extend(["관계", "어떤 사이"])
+                filled_field_keywords.extend(keywords)
+    
+    # 중복 제거
+    filled_field_keywords = list(set(filled_field_keywords))
     
     if filled_info_list:
-        filled_info_str = "\n".join(filled_info_list[:15])
-        filled_info_str += f"\n\n⚠️ 위 정보들은 이미 수집했으므로 절대 다시 묻지 마세요!"
+        # 모든 채워진 정보를 전달 (제한 없이)
+        filled_info_str = "\n".join(filled_info_list)
+        filled_info_str += f"\n\n🚨🚨🚨 위 {len(filled_info_list)}개 정보는 이미 수집 완료! 절대 다시 묻지 마세요! 🚨🚨🚨"
     else:
         filled_info_str = "(아직 없음)"
+    
+    # 방금 추출된 정보 정리 (사용자 답변 확인용)
+    just_extracted_str = ""
+    if extracted:
+        just_extracted_items = []
+        for field_name, field_value in extracted.items():
+            # 필드 설명 찾기
+            field_desc = "정보"
+            if current_doc and current_doc in session["documents"]:
+                field_desc = session["documents"][current_doc]["descriptions"].get(field_name, field_name)
+            just_extracted_items.append(f"- {field_desc}: {field_value}")
+        just_extracted_str = "\n".join(just_extracted_items)
+    else:
+        just_extracted_str = "(방금 추출된 정보 없음 - 사용자가 일반 대화를 하고 있거나 질문에 답하지 않았을 수 있음)"
     
     form_chain = create_form_chain(session_id)
     config = {"configurable": {"session_id": session_id}}
@@ -802,10 +1091,12 @@ async def process_form_conversation(
         print(f"[TALK_TO_FILL]   - 미작성 필드 수: {len(unfilled)}")
         print(f"[TALK_TO_FILL]   - 미작성 필드 (처음 5개): {[f['field'] for f in unfilled[:5]]}")
         print(f"[TALK_TO_FILL]   - 이미 채워진 정보 수: {len(filled_info_list)}")
+        print(f"[TALK_TO_FILL]   - 방금 추출된 정보: {extracted}")
         
         response = form_chain.invoke(
             {
                 "category": session["category"],
+                "just_extracted": just_extracted_str,
                 "filled_info": filled_info_str,
                 "unfilled_fields": unfilled_str,
                 "user_input": user_input
@@ -829,53 +1120,70 @@ async def process_form_conversation(
     print(f"[TALK_TO_FILL]   - 전체 미작성 필드 수: {len(all_unfilled)}")
     print(f"[TALK_TO_FILL]   - 완료: {is_completed}")
     
-    # 🚨🚨🚨 응답 검증 시스템 (3중 체크) 🚨🚨🚨
+    # 응답 검증 시스템
     if not is_completed and response_text:
         original_response = response_text
         validation_failed = False
         
-        # ========== 검증 1: 완료 메시지 체크 ==========
+        # ========== 검증 1: 완료 메시지 & 역할 혼동 체크 ==========
         completion_keywords = [
             "작성 완료", "완료되었습니다", "완료했습니다", "끝났습니다",
             "모든 정보가 입력", "서류가 완성", "다 되었습니다", "마무리되었습니다",
-            "작성이 끝", "입력이 완료", "모두 작성", "감사합니다", "수고하셨습니다"
+            "작성이 끝", "입력이 완료", "모두 작성", "감사합니다", "수고하셨습니다",
+            "제출하시겠어요", "제출하실", "확인하셨나요", "확인하실",
+            "추가로 필요한", "더 필요한", "필요하신 게", "필요한 사항이"
         ]
         
         contains_completion = any(keyword in response_text for keyword in completion_keywords)
         
         if contains_completion:
-            print(f"[TALK_TO_FILL] ❌ 검증 실패 (1/3): 잘못된 완료 메시지 발견!")
-            print(f"[TALK_TO_FILL]   - 원본: {response_text[:200]}")
+            print(f"[TALK_TO_FILL] ❌ 검증 실패 (1): 잘못된 완료 메시지 또는 역할 혼동!")
             validation_failed = True
         
         # ========== 검증 2: 질문으로 끝나는지 체크 ==========
-        # 응답이 물음표(?)로 끝나야 함
-        if not response_text.strip().endswith('?'):
+        # 응답의 마지막 줄이 물음표(?)로 끝나야 함
+        
+        # 마지막 줄만 추출 (여러 줄 응답 대응)
+        lines = response_text.strip().split('\n')
+        last_line = lines[-1].strip() if lines else ""
+        
+        # 마크다운 굵은 글씨 제거: **텍스트** → 텍스트
+        last_line = re.sub(r'\*\*([^*]+)\*\*', r'\1', last_line)
+        
+        # 마지막 줄이 물음표로 끝나는지 체크
+        if not last_line.endswith('?'):
             print(f"[TALK_TO_FILL] ❌ 검증 실패 (2/3): 질문으로 끝나지 않음!")
-            print(f"[TALK_TO_FILL]   - 원본: {response_text[:200]}")
+            print(f"[TALK_TO_FILL]   - 원본 마지막 줄: {lines[-1] if lines else '(없음)'}")
+            print(f"[TALK_TO_FILL]   - 정제된 마지막 줄: {last_line}")
             validation_failed = True
         
         # ========== 검증 3: 이미 채워진 필드를 다시 물어보는지 체크 ==========
-        # filled_info_list에 있는 필드 설명이 응답에 포함되어 있는지 확인
-        if filled_info_list:
-            for filled_item in filled_info_list[:5]:  # 최근 5개만 체크
-                # "- 이름: 홍길동" 형식에서 필드명 추출
-                if ':' in filled_item:
-                    field_desc = filled_item.split(':')[0].strip().replace('- ', '')
-                    # 응답에 이미 채워진 필드를 다시 물어보는지 체크
-                    ask_patterns = [
-                        f"{field_desc}이 어떻게",
-                        f"{field_desc}은 어떻게",
-                        f"{field_desc}는 어떻게",
-                        f"{field_desc}을 알려",
-                        f"{field_desc}를 알려"
-                    ]
-                    if any(pattern in response_text for pattern in ask_patterns):
+        # filled_field_keywords를 사용하여 더 포괄적으로 검증
+        if filled_field_keywords:
+            # 질문 패턴들
+            ask_suffixes = [
+                "이 어떻게", "은 어떻게", "는 어떻게",
+                "을 알려", "를 알려", "을 말씀", "를 말씀",
+                "이 뭐", "은 뭐", "는 뭐",
+                "을 입력", "를 입력",
+                "이요", "요?",  # "이름이요?", "주소요?"
+                "을 여쭤", "를 여쭤",
+                "이 무엇", "은 무엇", "는 무엇"
+            ]
+            
+            for keyword in filled_field_keywords:
+                if len(keyword) < 2:  # 너무 짧은 키워드는 건너뜀
+                    continue
+                for suffix in ask_suffixes:
+                    pattern = f"{keyword}{suffix}"
+                    if pattern in response_text:
                         print(f"[TALK_TO_FILL] ❌ 검증 실패 (3/3): 이미 채워진 필드를 다시 물어봄!")
-                        print(f"[TALK_TO_FILL]   - 이미 알고 있는 정보: {field_desc}")
+                        print(f"[TALK_TO_FILL]   - 감지된 패턴: '{pattern}'")
                         print(f"[TALK_TO_FILL]   - 원본: {response_text[:200]}")
                         validation_failed = True
                         break
+                if validation_failed:
+                    break
         
         # ========== 검증 실패 시 응답 자동 수정 ==========
         if validation_failed:
@@ -893,9 +1201,9 @@ async def process_form_conversation(
     
     if is_completed:
         session["completed"] = True
-        print(f"[TALK_TO_FILL] 🎉 모든 서류 작성 완료!")
+        print(f"[TALK_TO_FILL] 모든 서류 작성 완료!")
     else:
-        print(f"[TALK_TO_FILL] 📝 아직 {len(all_unfilled)}개 필드가 남아있습니다.")
+        print(f"[TALK_TO_FILL] 아직 {len(all_unfilled)}개 필드가 남아있습니다.")
         if all_unfilled:
             print(f"[TALK_TO_FILL]   - 다음 필드들: {[f['field'] for f in all_unfilled[:3]]}")
     
@@ -906,7 +1214,7 @@ async def process_form_conversation(
     print(f"[TALK_TO_FILL]   - response: {response_text[:100]}")
     
     return {
-        "response": response_text[:300],
+        "response": response_text[:500],  # 300 → 500으로 확장 (자연스러운 응답을 위해)
         "extracted_fields": extracted,
         "form_state": {
             "category": session["category"],
