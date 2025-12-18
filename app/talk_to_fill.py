@@ -399,20 +399,35 @@ def init_form_session(session_id: str, category: str) -> Dict[str, Any]:
         "completed": False
     }
     
+    total_all_fields = 0
     for doc_name, doc_data in documents.items():
+        field_count = len(doc_data["fields"])
+        total_all_fields += field_count
         form_state["documents"][doc_name] = {
             "fields": {field: "" for field in doc_data["fields"].keys()},
             "descriptions": doc_data["descriptions"],
             "template": doc_data["fields"],  # 원본 템플릿 저장
             "filled_count": 0,
-            "total_count": len(doc_data["fields"])
+            "total_count": field_count
         }
+        print(f"[FIELD_MEMORY] 📄 {doc_name} 문서: {field_count}개 필드")
+    
+    print(f"[FIELD_MEMORY] 📊 세션 초기화 완료 - 전체 필드 수: {total_all_fields}개 (모든 문서 합계)")
     
     # 첫 번째 문서를 현재 문서로 설정
     if documents:
         form_state["current_document"] = list(documents.keys())[0]
     
+    # 세션을 먼저 저장 (get_unfilled_fields()가 세션을 읽어야 함)
     form_session_store[session_id] = form_state
+    
+    # 실제 채워야 할 필드 수 계산 (공통 필드 그룹 처리 후)
+    # 세션이 생성된 직후이므로 모든 필드가 비어있음
+    initial_unfilled = get_unfilled_fields(session_id)
+    form_state["initial_total_fields"] = len(initial_unfilled)
+    form_session_store[session_id]["initial_total_fields"] = len(initial_unfilled)  # 세션에도 저장
+    print(f"[FIELD_MEMORY] 📊 실제 채워야 할 필드 수: {form_state['initial_total_fields']}개 (공통 필드 그룹 처리 후)")
+    
     return form_state
 
 
@@ -606,6 +621,9 @@ def get_unfilled_fields(session_id: str, document_name: str = None) -> List[Dict
     아직 채워지지 않은 필드 목록을 반환합니다.
     자동 계산 필드는 제외됩니다.
     공통 필드 그룹을 고려하여 같은 의미의 필드는 하나만 반환합니다.
+    
+    주의: document_name 파라미터는 무시되고 항상 모든 문서를 체크합니다.
+    공통 필드 그룹 처리를 위해 모든 문서를 함께 확인해야 합니다.
     """
     session = form_session_store.get(session_id)
     if not session:
@@ -622,13 +640,11 @@ def get_unfilled_fields(session_id: str, document_name: str = None) -> List[Dict
     category = session.get("category")
     category_groups = COMMON_FIELD_GROUPS_BY_CATEGORY.get(category, []) if category else []
     
-    # 공통 필드 그룹에서 이미 채워진 필드 추적
+    # 공통 필드 그룹에서 이미 채워진 필드 추적 (모든 문서에서 확인)
     filled_groups = set()  # 이미 채워진 그룹의 인덱스
-    group_field_map = {}  # 그룹 인덱스 -> 해당 그룹의 필드들
     
-    # 공통 필드 그룹 매핑 생성
+    # 공통 필드 그룹 매핑 생성 및 채워진 그룹 확인
     for group_idx, group in enumerate(category_groups):
-        group_field_map[group_idx] = group
         # 그룹 내 필드 중 하나라도 채워져 있으면 해당 그룹은 제외
         for field in group:
             for doc_name, doc_data in session["documents"].items():
@@ -637,20 +653,15 @@ def get_unfilled_fields(session_id: str, document_name: str = None) -> List[Dict
                     if field_value and field_value != "" and field_value != "N/A":
                         filled_groups.add(group_idx)
                         break
-                if group_idx in filled_groups:
-                    break
+            if group_idx in filled_groups:
+                break
     
-    unfilled = []
-    processed_common_fields = set()  # 이미 처리된 공통 필드 그룹
+    # 모든 문서의 미작성 필드를 먼저 수집
+    all_unfilled_fields = []  # (doc_name, field_name, description, is_common_field, group_idx)
     
-    docs_to_check = [document_name] if document_name else session["documents"].keys()
-    
-    for doc_name in docs_to_check:
-        doc = session["documents"].get(doc_name)
-        if not doc:
-            continue
-            
-        for field_name, value in doc["fields"].items():
+    # 모든 문서를 체크 (document_name 파라미터 무시)
+    for doc_name, doc_data in session["documents"].items():
+        for field_name, value in doc_data["fields"].items():
             # 자동 계산 필드는 제외
             if any(pattern in field_name for pattern in auto_calculated_patterns):
                 continue
@@ -663,29 +674,73 @@ def get_unfilled_fields(session_id: str, document_name: str = None) -> List[Dict
                     if field_name in group:
                         is_common_field = True
                         found_group_idx = group_idx
-                        # 이미 채워진 그룹이면 제외
-                        if group_idx in filled_groups:
-                            break
-                        # 같은 그룹의 필드가 이미 처리되었으면 제외 (하나만 반환)
-                        if group_idx in processed_common_fields:
-                            break
-                        # 첫 번째로 발견된 그룹의 필드만 추가
-                        processed_common_fields.add(group_idx)
-                        # 공통 필드 그룹의 첫 번째 필드로 추가
-                        unfilled.append({
-                            "document": doc_name,
-                            "field": field_name,
-                            "description": doc["descriptions"].get(field_name, field_name)
-                        })
                         break
                 
-                # 공통 필드가 아닌 경우 (공통 필드 그룹에 속하지 않음)
-                if not is_common_field:
-                    unfilled.append({
-                        "document": doc_name,
-                        "field": field_name,
-                        "description": doc["descriptions"].get(field_name, field_name)
-                    })
+                description = doc_data["descriptions"].get(field_name, field_name)
+                all_unfilled_fields.append({
+                    "document": doc_name,
+                    "field": field_name,
+                    "description": description,
+                    "is_common_field": is_common_field,
+                    "group_idx": found_group_idx
+                })
+    
+    # 공통 필드 그룹 처리: 같은 그룹의 필드 중 하나만 선택
+    unfilled = []
+    processed_common_groups = set()  # 이미 처리된 공통 필드 그룹
+    
+    for field_info in all_unfilled_fields:
+        if field_info["is_common_field"]:
+            group_idx = field_info["group_idx"]
+            # 이미 채워진 그룹이면 제외
+            if group_idx in filled_groups:
+                continue
+            # 같은 그룹의 필드가 이미 처리되었으면 제외 (하나만 반환)
+            if group_idx in processed_common_groups:
+                continue
+            # 첫 번째로 발견된 그룹의 필드만 추가
+            processed_common_groups.add(group_idx)
+            unfilled.append({
+                "document": field_info["document"],
+                "field": field_info["field"],
+                "description": field_info["description"]
+            })
+        else:
+            # 공통 필드가 아닌 경우 그대로 추가
+            unfilled.append({
+                "document": field_info["document"],
+                "field": field_info["field"],
+                "description": field_info["description"]
+            })
+    
+    # 디버깅: 전체 필드 통계 출력
+    total_fields_count = 0
+    auto_calculated_count = 0
+    filled_fields_count = 0
+    
+    for doc_name, doc_data in session["documents"].items():
+        for field_name, value in doc_data["fields"].items():
+            total_fields_count += 1
+            if any(pattern in field_name for pattern in auto_calculated_patterns):
+                auto_calculated_count += 1
+            elif value and value != "" and value != "N/A":
+                filled_fields_count += 1
+    
+    unfilled_fields_count = len(unfilled)
+    
+    print(f"[FIELD_MEMORY] 📊 필드 통계 (모든 문서):")
+    print(f"[FIELD_MEMORY]   - 전체 필드: {total_fields_count}개")
+    print(f"[FIELD_MEMORY]   - 자동 계산 필드: {auto_calculated_count}개 (제외됨)")
+    print(f"[FIELD_MEMORY]   - 채워진 필드: {filled_fields_count}개")
+    print(f"[FIELD_MEMORY]   - 채워야 할 필드: {unfilled_fields_count}개 (공통 필드 그룹 처리 후)")
+    
+    # 디버깅: 채워야 할 필드 목록 로그 출력 (전체)
+    if unfilled:
+        print(f"[FIELD_MEMORY] 📋 채워야 할 필드 목록 ({len(unfilled)}개):")
+        for idx, field_info in enumerate(unfilled, 1):
+            print(f"[FIELD_MEMORY]   {idx}. {field_info['document']}.{field_info['field']} - {field_info['description']}")
+    else:
+        print(f"[FIELD_MEMORY] ✅ 채워야 할 필드 없음 (모든 필드 채워짐)")
     
     return unfilled
 
@@ -820,6 +875,7 @@ async def process_form_conversation(
                 "form_state": {
                     "category": session["category"],
                     "current_document": session["current_document"],
+                    "total_fields": session.get("initial_total_fields", 0),
                     "documents": {
                         doc_name: {
                             "filled_count": doc["filled_count"],
@@ -900,12 +956,16 @@ async def process_form_conversation(
         # 추출된 정보로 폼 업데이트
         # 빈 문자열("")도 유효한 값 (체크박스 필드에서 "체크하지 않음"을 의미)
         print(f"[TALK_TO_FILL] 📝 필드 업데이트 시작 - 추출된 필드 수: {len(extracted)}")
+        print(f"[FIELD_MEMORY] 🔄 업데이트 전 상태:")
+        print(f"[FIELD_MEMORY]   - 채워야 할 필드: {len(unfilled)}개")
+        
         for field_name, value in extracted.items():
             if value is not None:  # None이 아니면 업데이트 (빈 문자열 포함)
                 # 먼저 현재 문서에서 시도
                 success = update_form_field(session_id, current_doc, field_name, value)
                 if success:
                     print(f"[TALK_TO_FILL] ✅ 필드 업데이트 성공: {current_doc}.{field_name} = {value}")
+                    print(f"[FIELD_MEMORY]   ✅ {current_doc}.{field_name} = '{value}' (채워짐)")
                 else:
                     # 현재 문서에 없으면 다른 모든 문서에서 찾아서 업데이트
                     found = False
@@ -914,10 +974,17 @@ async def process_form_conversation(
                             success = update_form_field(session_id, doc_name, field_name, value)
                             if success:
                                 print(f"[TALK_TO_FILL] ✅ 필드 업데이트 성공 (다른 문서): {doc_name}.{field_name} = {value}")
+                                print(f"[FIELD_MEMORY]   ✅ {doc_name}.{field_name} = '{value}' (채워짐)")
                                 found = True
                                 break
                     if not found:
                         print(f"[TALK_TO_FILL] ⚠️ 필드를 찾을 수 없음: {field_name}")
+                        print(f"[FIELD_MEMORY]   ⚠️ 필드를 찾을 수 없음: {field_name}")
+        
+        # 업데이트 후 상태 출력
+        updated_unfilled = get_unfilled_fields(session_id)  # 모든 문서 체크
+        print(f"[FIELD_MEMORY] 🔄 업데이트 후 상태:")
+        print(f"[FIELD_MEMORY]   - 채워야 할 필드: {len(updated_unfilled)}개 (이전: {len(unfilled)}개)")
         
         # 사용자가 "필요없음", "해당없음" 등을 말하면 현재 질문한 필드들을 건너뛰기
         skip_keywords = ["필요없", "해당없", "해당 없", "모르겠", "없어", "아니", "건너뛰", "스킵"]
@@ -930,22 +997,12 @@ async def process_form_conversation(
     else:
         extracted = {}
     
-    # 업데이트된 미작성 필드 목록
-    unfilled = get_unfilled_fields(session_id, current_doc)
+    # 업데이트된 미작성 필드 목록 (모든 문서 체크)
+    unfilled = get_unfilled_fields(session_id)
     
-    # 현재 문서가 완료되었는지 확인
-    if not unfilled and current_doc:
-        # 다음 문서로 이동
-        doc_names = list(session["documents"].keys())
-        current_idx = doc_names.index(current_doc)
-        
-        if current_idx + 1 < len(doc_names):
-            session["current_document"] = doc_names[current_idx + 1]
-            current_doc = session["current_document"]
-            unfilled = get_unfilled_fields(session_id, current_doc)
-        else:
-            # 모든 문서 완료
-            session["completed"] = True
+    # 모든 필드가 채워졌는지 확인
+    # 공통 필드 그룹 처리로 모든 문서의 필드를 함께 관리하므로
+    # 문서별 순차 처리는 더 이상 필요 없음
     
     # 대화 응답 생성
     # ⚠️ 중요: "모든 필드가 채워졌습니다" 같은 메시지를 LLM에게 보내지 않기!
@@ -992,6 +1049,7 @@ async def process_form_conversation(
                 "form_state": {
                     "category": session["category"],
                     "current_document": current_doc,
+                    "total_fields": session.get("initial_total_fields", 0),
                     "documents": {
                         doc_name: {
                             "filled_count": doc["filled_count"],
@@ -1016,6 +1074,7 @@ async def process_form_conversation(
                 "form_state": {
                     "category": session["category"],
                     "current_document": current_doc,
+                    "total_fields": session.get("initial_total_fields", 0),
                     "documents": {
                         doc_name: {
                             "filled_count": doc["filled_count"],
@@ -1029,10 +1088,17 @@ async def process_form_conversation(
                 "completed": True
             }
     
+    # 실제 채워야 할 필드 수는 세션의 initial_total_fields 사용
+    # 이 값은 세션 초기화 시 unfilled_count로 설정됨
+    actual_total_fields = session.get("initial_total_fields", 0)
+    
     # 이미 채워진 정보 수집 (LLM이 중복 질문하지 않도록)
     filled_info_list = []
     filled_field_descriptions = []  # 필드 설명만 저장 (검증용)
     filled_field_keywords = []  # 검증용 키워드 (더 포괄적)
+    
+    # 디버깅: 채워진 필드 목록 수집
+    filled_fields_detail = []
     
     for doc_name, doc_data in session["documents"].items():
         for field_name, field_value in doc_data["fields"].items():
@@ -1040,6 +1106,12 @@ async def process_form_conversation(
                 # 설명 가져오기
                 field_desc = doc_data["descriptions"].get(field_name, field_name)
                 filled_info_list.append(f"- {field_desc}: {field_value}")
+                filled_fields_detail.append({
+                    "document": doc_name,
+                    "field": field_name,
+                    "description": field_desc,
+                    "value": field_value
+                })
                 filled_field_descriptions.append(field_desc)
                 
                 # 검증용 키워드 추출 (더 포괄적인 매칭을 위해)
@@ -1059,6 +1131,14 @@ async def process_form_conversation(
     
     # 중복 제거
     filled_field_keywords = list(set(filled_field_keywords))
+    
+    # 디버깅: 채워진 필드 목록 로그 출력 (전체)
+    if filled_fields_detail:
+        print(f"[FIELD_MEMORY] ✅ 채워진 필드 ({len(filled_fields_detail)}개):")
+        for idx, field_info in enumerate(filled_fields_detail, 1):
+            print(f"[FIELD_MEMORY]   {idx}. {field_info['document']}.{field_info['field']} = '{field_info['value']}' ({field_info['description']})")
+    else:
+        print(f"[FIELD_MEMORY] 📝 채워진 필드 없음 (아직 입력 전)")
     
     if filled_info_list:
         # 모든 채워진 정보를 전달 (제한 없이)
@@ -1213,12 +1293,16 @@ async def process_form_conversation(
     print(f"[TALK_TO_FILL]   - unfilled_count: {len(all_unfilled)}")
     print(f"[TALK_TO_FILL]   - response: {response_text[:100]}")
     
+    # 실제 채워야 할 필드 수 (세션에 저장된 초기값 사용)
+    actual_total_fields = session.get("initial_total_fields", len(all_unfilled))
+    
     return {
         "response": response_text[:500],  # 300 → 500으로 확장 (자연스러운 응답을 위해)
         "extracted_fields": extracted,
         "form_state": {
             "category": session["category"],
             "current_document": current_doc,
+            "total_fields": actual_total_fields,  # 실제 채워야 할 필드 수 (공통 필드 그룹 처리 후)
             "documents": {
                 doc_name: {
                     "filled_count": doc["filled_count"],
@@ -1233,13 +1317,69 @@ async def process_form_conversation(
     }
 
 
+def fill_common_fields_for_pdf(session_id: str):
+    """
+    PDF 생성 전에 공통 필드 매핑을 참조하여 모든 문서의 필드를 채웁니다.
+    한 문서에만 채워진 공통 필드 값을 다른 문서의 대응 필드에도 자동으로 입력합니다.
+    """
+    session = form_session_store.get(session_id)
+    if not session:
+        return
+    
+    category = session.get("category")
+    if not category:
+        return
+    
+    # 해당 카테고리의 공통 필드 그룹 가져오기
+    category_groups = COMMON_FIELD_GROUPS_BY_CATEGORY.get(category, [])
+    if not category_groups:
+        return
+    
+    print(f"[PDF_FILL] 📝 PDF 생성 전 공통 필드 채우기 시작 - 카테고리: {category}")
+    
+    # 각 공통 필드 그룹을 순회
+    for group_idx, group in enumerate(category_groups):
+        # 그룹 내에서 채워진 값 찾기
+        filled_value = None
+        filled_field = None
+        
+        for doc_name, doc_data in session["documents"].items():
+            for field_name in group:
+                if field_name in doc_data["fields"]:
+                    value = doc_data["fields"][field_name]
+                    if value and value != "" and value != "N/A":
+                        filled_value = value
+                        filled_field = field_name
+                        break
+            if filled_value:
+                break
+        
+        # 찾은 값으로 그룹 내 다른 필드들을 채우기
+        if filled_value:
+            print(f"[PDF_FILL] 🔄 그룹 {group_idx + 1}: '{filled_field}' = '{filled_value}' → 다른 필드에 복사")
+            for doc_name, doc_data in session["documents"].items():
+                for field_name in group:
+                    if field_name in doc_data["fields"]:
+                        current_value = doc_data["fields"][field_name]
+                        # 비어있는 필드만 채우기
+                        if not current_value or current_value == "":
+                            doc_data["fields"][field_name] = filled_value
+                            print(f"[PDF_FILL]   ✅ {doc_name}.{field_name} = {filled_value}")
+    
+    print(f"[PDF_FILL] ✅ 공통 필드 채우기 완료")
+
+
 def get_filled_form(session_id: str) -> Optional[Dict[str, Any]]:
     """
     완성된 폼 데이터를 반환합니다.
+    PDF 생성 전에 공통 필드를 채웁니다.
     """
     session = get_form_session(session_id)
     if not session:
         return None
+    
+    # PDF 생성 전에 공통 필드 채우기
+    fill_common_fields_for_pdf(session_id)
     
     result = {
         "category": session["category"],

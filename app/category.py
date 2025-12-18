@@ -763,6 +763,10 @@ async def voice_process(request: VoiceTextRequest):
                     response=initial_form_result.get("response", "")[:100] if initial_form_result.get("response") else None
                 )
                 
+                # 실제 채워야 할 필드 수는 form_state에 포함되어 있음 (initial_total_fields)
+                # get_unfilled_fields는 init_form_session에서 이미 계산됨
+                actual_total_fields = form_state.get("initial_total_fields", 0)
+                
                 return {
                     "transcribed_text": transcribed_text,
                     "mode": "form",  # 폼 모드로 전환!
@@ -771,7 +775,7 @@ async def voice_process(request: VoiceTextRequest):
                     "form_session_id": form_session_id,
                     "category_answer": classification_result.get("answer"),  # 카테고리 분류 답변
                     "documents": list(form_state["documents"].keys()),
-                    "total_fields": sum(doc["total_count"] for doc in form_state["documents"].values()),
+                    "total_fields": actual_total_fields,  # 실제 채워야 할 필드 수 (공통 필드 그룹 처리 후)
                     **initial_form_result  # 폼 작성 첫 질문 포함
                 }
             else:

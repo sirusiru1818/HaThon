@@ -991,13 +991,11 @@
 
             if (completed) return;
 
-            // 총 필드 수 계산
-            let totalFields = 0;
-            let filledFields = 0;
-            for (const doc of Object.values(formState.documents)) {
-                totalFields += doc.total_count;
-                filledFields += doc.filled_count;
-            }
+            // 실제 채워야 할 필드 수 (백엔드에서 제공, 공통 필드 그룹 처리 후)
+            const totalFields = formState.total_fields || 0;
+            
+            // 채워진 필드 수 = 전체 - 남은 필드 수
+            const filledFields = totalFields - unfilledCount;
 
             const percent = totalFields > 0 ? Math.round((filledFields / totalFields) * 100) : 0;
 
