@@ -396,7 +396,9 @@ def init_form_session(session_id: str, category: str) -> Dict[str, Any]:
         "category": category,
         "documents": {},
         "current_document": None,
-        "completed": False
+        "completed": False,
+        "guardian_checked": False,  # 후견인 존재 여부 확인 여부
+        "guardian_exists": None     # 후견인 존재 여부 (True/False/None)
     }
     
     total_all_fields = 0
@@ -624,6 +626,8 @@ def get_unfilled_fields(session_id: str, document_name: str = None) -> List[Dict
     
     주의: document_name 파라미터는 무시되고 항상 모든 문서를 체크합니다.
     공통 필드 그룹 처리를 위해 모든 문서를 함께 확인해야 합니다.
+    
+    후견인 필드의 경우, 먼저 후견인 존재 여부를 확인합니다.
     """
     session = form_session_store.get(session_id)
     if not session:
@@ -639,6 +643,38 @@ def get_unfilled_fields(session_id: str, document_name: str = None) -> List[Dict
     
     category = session.get("category")
     category_groups = COMMON_FIELD_GROUPS_BY_CATEGORY.get(category, []) if category else []
+    
+    # 후견인 필드 패턴 (guardian.으로 시작하는 필드)
+    guardian_field_pattern = "guardian."
+    
+    # 후견인 필드가 있는지 확인
+    has_guardian_fields = False
+    guardian_fields = []
+    for doc_name, doc_data in session["documents"].items():
+        for field_name, value in doc_data["fields"].items():
+            if guardian_field_pattern in field_name:
+                has_guardian_fields = True
+                if value == "":
+                    guardian_fields.append({
+                        "document": doc_name,
+                        "field": field_name,
+                        "description": doc_data["descriptions"].get(field_name, field_name)
+                    })
+    
+    # 후견인 존재 여부 확인이 필요한 경우 (후견인 필드가 있고 아직 확인되지 않음)
+    guardian_checked = session.get("guardian_checked", False)
+    if has_guardian_fields and not guardian_checked and guardian_fields:
+        # 먼저 후견인 존재 여부 확인을 위한 특별한 필드 반환
+        return [{
+            "document": guardian_fields[0]["document"],
+            "field": "__guardian_exists__",  # 특별한 필드명
+            "description": "후견인이 있으신가요?"
+        }]
+    
+    # 후견인이 없다고 확인된 경우, 후견인 필드는 제외
+    if guardian_checked and session.get("guardian_exists") == False:
+        # 후견인 필드는 건너뛰기 (이미 N/A로 채워짐)
+        pass
     
     # 공통 필드 그룹에서 이미 채워진 필드 추적 (모든 문서에서 확인)
     filled_groups = set()  # 이미 채워진 그룹의 인덱스
@@ -665,6 +701,11 @@ def get_unfilled_fields(session_id: str, document_name: str = None) -> List[Dict
             # 자동 계산 필드는 제외
             if any(pattern in field_name for pattern in auto_calculated_patterns):
                 continue
+            
+            # 후견인이 없다고 확인된 경우, 후견인 필드는 제외
+            if guardian_checked and session.get("guardian_exists") == False:
+                if guardian_field_pattern in field_name:
+                    continue
             
             if value == "":
                 # 공통 필드 그룹에 속하는지 확인
@@ -773,12 +814,13 @@ form_filling_prompt = ChatPromptTemplate.from_messages([
 1. 반드시 한국어만 사용하세요.
 2. "이미 수집 완료" 목록에 있는 정보는 절대 다시 묻지 마세요.
 3. "아직 필요한 정보" 목록의 첫 번째 항목만 질문하세요.
-4. 응답 형식: "네, OOO 확인했습니다. OOO는 어떻게 되시나요?"
+4. 응답 형식: "네, OOO 확인했습니다. (질문)"
 5. 반드시 물음표(?)로 끝나는 질문을 하세요.
 6. 한 번에 1개 정보만 물어보세요.
 7. "완료", "감사합니다", "끝" 같은 말 하지 마세요.
 8. "위와 같음", "상동", "동일" 같은 표현 사용 금지.
-9. 사용자에게 "필요한 게 있나요?" 묻지 마세요. 당신이 직접 질문하세요."""),
+9. 사용자에게 "필요한 게 있나요?" 묻지 마세요. 당신이 직접 질문하세요.
+10. "후견인이 있으신가요?" 같은 질문이 나오면, 사용자가 "없다"고 답하면 후견인 관련 모든 필드는 N/A로 처리되고 더 이상 묻지 않습니다. "있다"고 답하면 후견인 관련 필드들을 순차적으로 질문하세요."""),
     MessagesPlaceholder(variable_name="history"),
     ("human", "{user_input}")
 ])
@@ -899,6 +941,110 @@ async def process_form_conversation(
     if unfilled:
         print(f"[TALK_TO_FILL] 처음 5개 미작성 필드: {[f['field'] for f in unfilled[:5]]}")
     
+    # 후견인 존재 여부 확인 단계 처리
+    if unfilled and len(unfilled) > 0 and unfilled[0]["field"] == "__guardian_exists__":
+        # 후견인 존재 여부 질문에 대한 사용자 응답 처리
+        negative_keywords = ["없", "아니", "아뇨", "아니요", "필요없", "해당없", "해당 없", "없어요", "없습니다"]
+        positive_keywords = ["있", "예", "네", "있어요", "있습니다", "있어"]
+        
+        user_input_lower = user_input.lower()
+        has_negative = any(keyword in user_input for keyword in negative_keywords)
+        has_positive = any(keyword in user_input for keyword in positive_keywords)
+        
+        if has_negative and not has_positive:
+            # 후견인이 없는 경우: 모든 후견인 필드를 N/A로 채우기
+            print(f"[TALK_TO_FILL] 🔍 후견인이 없다고 확인됨 - 모든 후견인 필드를 N/A로 채움")
+            session["guardian_checked"] = True
+            session["guardian_exists"] = False
+            
+            # 모든 문서에서 후견인 필드 찾아서 N/A로 채우기
+            guardian_fields_filled = 0
+            for doc_name, doc_data in session["documents"].items():
+                for field_name in doc_data["fields"].keys():
+                    if "guardian." in field_name:
+                        old_value = doc_data["fields"][field_name]
+                        if old_value == "":
+                            doc_data["fields"][field_name] = "N/A"
+                            doc_data["filled_count"] += 1
+                            guardian_fields_filled += 1
+                            print(f"[TALK_TO_FILL]   ✅ {doc_name}.{field_name} = N/A")
+            
+            print(f"[TALK_TO_FILL] ✅ 후견인 필드 {guardian_fields_filled}개를 N/A로 채움")
+            
+            # 다음 필드로 진행
+            updated_unfilled = get_unfilled_fields(session_id)
+            if updated_unfilled:
+                next_field_desc = updated_unfilled[0]['description']
+                return {
+                    "response": f"알겠습니다. 후견인 관련 정보는 제외하겠습니다. {next_field_desc}는 어떻게 되시나요?",
+                    "extracted_fields": {},
+                    "form_state": {
+                        "category": session["category"],
+                        "current_document": current_doc,
+                        "total_fields": session.get("initial_total_fields", 0),
+                        "documents": {
+                            doc_name: {
+                                "filled_count": doc["filled_count"],
+                                "total_count": doc["total_count"],
+                                "fields": doc["fields"]
+                            }
+                            for doc_name, doc in session["documents"].items()
+                        }
+                    },
+                    "unfilled_count": len(updated_unfilled),
+                    "completed": False
+                }
+        elif has_positive:
+            # 후견인이 있는 경우: 후견인 필드들을 순차적으로 질문
+            print(f"[TALK_TO_FILL] 🔍 후견인이 있다고 확인됨 - 후견인 필드들을 질문하도록 설정")
+            session["guardian_checked"] = True
+            session["guardian_exists"] = True
+            
+            # 다음 필드로 진행 (후견인 필드 중 첫 번째)
+            updated_unfilled = get_unfilled_fields(session_id)
+            if updated_unfilled:
+                next_field_desc = updated_unfilled[0]['description']
+                return {
+                    "response": f"알겠습니다. {next_field_desc}는 어떻게 되시나요?",
+                    "extracted_fields": {},
+                    "form_state": {
+                        "category": session["category"],
+                        "current_document": current_doc,
+                        "total_fields": session.get("initial_total_fields", 0),
+                        "documents": {
+                            doc_name: {
+                                "filled_count": doc["filled_count"],
+                                "total_count": doc["total_count"],
+                                "fields": doc["fields"]
+                            }
+                            for doc_name, doc in session["documents"].items()
+                        }
+                    },
+                    "unfilled_count": len(updated_unfilled),
+                    "completed": False
+                }
+        else:
+            # 명확하지 않은 응답: 다시 질문
+            return {
+                "response": "후견인이 있으신가요, 없으신가요?",
+                "extracted_fields": {},
+                "form_state": {
+                    "category": session["category"],
+                    "current_document": current_doc,
+                    "total_fields": session.get("initial_total_fields", 0),
+                    "documents": {
+                        doc_name: {
+                            "filled_count": doc["filled_count"],
+                            "total_count": doc["total_count"],
+                            "fields": doc["fields"]
+                        }
+                        for doc_name, doc in session["documents"].items()
+                    }
+                },
+                "unfilled_count": len(unfilled),
+                "completed": False
+            }
+    
     # 사용자 응답에서 정보 추출
     if unfilled:
         target_fields_str = "\n".join([
@@ -987,13 +1133,17 @@ async def process_form_conversation(
         print(f"[FIELD_MEMORY]   - 채워야 할 필드: {len(updated_unfilled)}개 (이전: {len(unfilled)}개)")
         
         # 사용자가 "필요없음", "해당없음" 등을 말하면 현재 질문한 필드들을 건너뛰기
+        # 단, 후견인 존재 여부 질문(__guardian_exists__)은 제외 (별도 처리됨)
         skip_keywords = ["필요없", "해당없", "해당 없", "모르겠", "없어", "아니", "건너뛰", "스킵"]
         if any(keyword in user_input for keyword in skip_keywords) and not extracted:
-            print(f"[TALK_TO_FILL] ⏭️ 사용자가 필드 스킵 요청")
-            # 현재 물어본 필드들(최대 5개)을 "N/A"로 채우기
-            for field_info in unfilled[:5]:
-                update_form_field(session_id, current_doc, field_info['field'], "N/A")
-                print(f"[TALK_TO_FILL]   - {field_info['field']} → N/A")
+            # 후견인 존재 여부 질문은 스킵하지 않음 (별도 처리됨)
+            if unfilled and len(unfilled) > 0 and unfilled[0]["field"] != "__guardian_exists__":
+                print(f"[TALK_TO_FILL] ⏭️ 사용자가 필드 스킵 요청")
+                # 현재 물어본 필드들(최대 5개)을 "N/A"로 채우기
+                for field_info in unfilled[:5]:
+                    if field_info['field'] != "__guardian_exists__":
+                        update_form_field(session_id, current_doc, field_info['field'], "N/A")
+                        print(f"[TALK_TO_FILL]   - {field_info['field']} → N/A")
     else:
         extracted = {}
     

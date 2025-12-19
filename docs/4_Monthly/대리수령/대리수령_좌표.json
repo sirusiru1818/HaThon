@@ -1,34 +1,34 @@
 {
-    "recipient.name":      { "x": 170, "y": 720 },
-    "recipient.birthdate": { "x": 400, "y": 720 },
-    "recipient.gender":    { "x": 520, "y": 720 },
-    "recipient.number":     { "x": 140, "y": 700 },
-    "recipient.mobile":    { "x": 430, "y": 700 },
-    "recipient.address":   { "x": 170, "y": 675 },
-  
-    "application_reason.guardianship_no_account": { "x": 140, "y": 655 },
-    "application_reason.seized_claim":           { "x": 140, "y": 635 },
-    "application_reason.dementia_or_immobility": { "x": 140, "y": 615 },
-  
-    "receive_period.start_year":  { "x": 160, "y": 577 },
-    "receive_period.start_month": { "x": 210, "y": 577 },
-    "receive_period.end_year":    { "x": 290, "y": 577 },
-    "receive_period.end_month":   { "x": 360, "y": 577 },
-    "receive_period.total_months":{ "x": 440, "y": 577 },
-  
-    "guardian.name":      { "x": 170, "y": 525 },
-    "guardian.birthdate": { "x": 380, "y": 525 },
-    "guardian.number":     { "x": 170, "y": 505 },
-    "guardian.mobile":    { "x": 400, "y": 505 },
-    "guardian.address":   { "x": 170, "y": 480 },
-  
-    "representative_recipient.name":      { "x": 170, "y": 450 },
-    "representative_recipient.birthdate": { "x": 380, "y": 450 },
-    "representative_recipient.phone":     { "x": 170, "y": 430 },
-    "representative_recipient.number":    { "x": 400, "y": 430 },
-    "representative_recipient.address":   { "x": 170, "y": 400 },
-    "representative_recipient.relationship_to_recipient": { "x": 170, "y": 380 },
-  
-    "bank_account.bank_name":     { "x": 110, "y": 338 },
-    "bank_account.account_number":{ "x": 252, "y": 338 }
-  }
+  "recipient.name":      { "x": 720, "y": 170 },
+  "recipient.birthdate": { "x": 720, "y": 400 },
+  "recipient.gender":    { "x": 720, "y": 520 },
+  "recipient.number":    { "x": 700, "y": 140 },
+  "recipient.mobile":    { "x": 700, "y": 430 },
+  "recipient.address":   { "x": 675, "y": 170 },
+
+  "application_reason.guardianship_no_account": { "x": 655, "y": 140 },
+  "application_reason.seized_claim":            { "x": 635, "y": 140 },
+  "application_reason.dementia_or_immobility":  { "x": 615, "y": 140 },
+
+  "receive_period.start_year":   { "x": 577, "y": 160 },
+  "receive_period.start_month":  { "x": 577, "y": 210 },
+  "receive_period.end_year":     { "x": 577, "y": 290 },
+  "receive_period.end_month":    { "x": 577, "y": 360 },
+  "receive_period.total_months": { "x": 577, "y": 440 },
+
+  "guardian.name":      { "x": 525, "y": 170 },
+  "guardian.birthdate": { "x": 525, "y": 380 },
+  "guardian.number":    { "x": 505, "y": 170 },
+  "guardian.mobile":    { "x": 505, "y": 400 },
+  "guardian.address":   { "x": 480, "y": 170 },
+
+  "representative_recipient.name":      { "x": 450, "y": 170 },
+  "representative_recipient.birthdate": { "x": 450, "y": 380 },
+  "representative_recipient.phone":     { "x": 430, "y": 170 },
+  "representative_recipient.number":    { "x": 430, "y": 400 },
+  "representative_recipient.address":   { "x": 400, "y": 170 },
+  "representative_recipient.relationship_to_recipient": { "x": 380, "y": 170 },
+
+  "bank_account.bank_name":      { "x": 338, "y": 110 },
+  "bank_account.account_number": { "x": 338, "y": 252 }
+}
