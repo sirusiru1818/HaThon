@@ -1,6 +1,7 @@
 # category.py
 import os
 import sys
+import warnings
 from fastapi import FastAPI, UploadFile, File, HTTPException
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import HTMLResponse, FileResponse
@@ -10,6 +11,9 @@ from dotenv import load_dotenv
 from typing import Optional, List
 from datetime import datetime
 import json
+
+# Pydantic V1 호환성 경고 제거
+warnings.filterwarnings("ignore", message=".*Pydantic V1.*", category=UserWarning)
 
 from langchain_aws import ChatBedrockConverse  # 새로 추가
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
@@ -476,10 +480,8 @@ async def get_categories():
 try:
     from stt_processor import process_audio_and_get_query_async
     VOICE_AVAILABLE = True
-    print("✅ Voice 모듈 로드 성공")
-except ImportError as e:
+except ImportError:
     VOICE_AVAILABLE = False
-    print(f"⚠️ Voice 모듈 로드 실패 (pyaudio 필요): {e}")
 
 
 class VoiceTranscribeRequest(BaseModel):

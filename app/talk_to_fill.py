@@ -384,6 +384,72 @@ def get_chat_history(session_id: str) -> BaseChatMessageHistory:
     return history
 
 
+def calculate_initial_total_fields(session_id: str) -> int:
+    """
+    세션 초기화 시 실제 채워야 할 필드 수를 계산합니다.
+    
+    get_unfilled_fields()와 달리, 후견인 체크 여부와 관계없이 
+    모든 필드를 정확히 계산합니다.
+    - 자동 계산 필드 제외
+    - 공통 필드 그룹은 하나로 계산
+    - 후견인 필드도 포함 (후에 질문하거나 N/A로 채워짐)
+    """
+    session = form_session_store.get(session_id)
+    if not session:
+        return 0
+    
+    # 자동 계산되는 필드 패턴 (사용자에게 묻지 않음)
+    auto_calculated_patterns = [
+        "total_months",  # 수령 기간 (개월 수)
+        "period",        # 기간
+        "duration",      # 기간
+        "total_days",    # 총 일수
+    ]
+    
+    category = session.get("category")
+    category_groups = COMMON_FIELD_GROUPS_BY_CATEGORY.get(category, []) if category else []
+    
+    # 모든 미작성 필드 수집
+    all_unfilled_fields = []
+    
+    for doc_name, doc_data in session["documents"].items():
+        for field_name, value in doc_data["fields"].items():
+            # 자동 계산 필드는 제외
+            if any(pattern in field_name for pattern in auto_calculated_patterns):
+                continue
+            
+            if value == "":
+                # 공통 필드 그룹에 속하는지 확인
+                is_common_field = False
+                found_group_idx = None
+                for group_idx, group in enumerate(category_groups):
+                    if field_name in group:
+                        is_common_field = True
+                        found_group_idx = group_idx
+                        break
+                
+                all_unfilled_fields.append({
+                    "field": field_name,
+                    "is_common_field": is_common_field,
+                    "group_idx": found_group_idx
+                })
+    
+    # 공통 필드 그룹 처리: 같은 그룹의 필드 중 하나만 계산
+    total = 0
+    processed_common_groups = set()
+    
+    for field_info in all_unfilled_fields:
+        if field_info["is_common_field"]:
+            group_idx = field_info["group_idx"]
+            if group_idx not in processed_common_groups:
+                processed_common_groups.add(group_idx)
+                total += 1
+        else:
+            total += 1
+    
+    return total
+
+
 def init_form_session(session_id: str, category: str) -> Dict[str, Any]:
     """
     폼 작성 세션을 초기화합니다.
@@ -424,10 +490,11 @@ def init_form_session(session_id: str, category: str) -> Dict[str, Any]:
     form_session_store[session_id] = form_state
     
     # 실제 채워야 할 필드 수 계산 (공통 필드 그룹 처리 후)
-    # 세션이 생성된 직후이므로 모든 필드가 비어있음
-    initial_unfilled = get_unfilled_fields(session_id)
-    form_state["initial_total_fields"] = len(initial_unfilled)
-    form_session_store[session_id]["initial_total_fields"] = len(initial_unfilled)  # 세션에도 저장
+    # ⚠️ 주의: get_unfilled_fields()는 후견인 체크 전에 __guardian_exists__ 가상 필드만 반환하므로
+    # 초기 필드 수 계산에는 전용 함수를 사용해야 함
+    initial_total = calculate_initial_total_fields(session_id)
+    form_state["initial_total_fields"] = initial_total
+    form_session_store[session_id]["initial_total_fields"] = initial_total  # 세션에도 저장
     print(f"[FIELD_MEMORY] 📊 실제 채워야 할 필드 수: {form_state['initial_total_fields']}개 (공통 필드 그룹 처리 후)")
     
     return form_state
@@ -453,6 +520,36 @@ def update_form_field(session_id: str, document_name: str, field_name: str, valu
     
     if field_name in doc["fields"]:
         old_value = doc["fields"][field_name]
+        
+        # 후견인 필드에 부정 키워드가 입력되면 N/A로 변환하고 모든 후견인 필드를 N/A로 채움
+        if "guardian." in field_name:
+            negative_keywords = ["없", "아니", "아뇨", "아니요", "필요없", "해당없", "해당 없", "없어요", "없습니다", "없음", "없네", "없는", "없다", "없어", "없다고", "안", "안해", "안해요", "안합니다", "하지않", "하지 않"]
+            value_lower = value.lower() if value else ""
+            if any(keyword in value_lower for keyword in negative_keywords):
+                print(f"[UPDATE_FIELD] 후견인 필드에 부정 키워드 감지: {field_name} = '{value}' → 모든 후견인 필드를 N/A로 처리")
+                value = "N/A"
+                
+                # 후견인이 없다고 확인했으므로 세션 상태 업데이트 및 모든 후견인 필드를 N/A로 채움
+                session["guardian_checked"] = True
+                session["guardian_exists"] = False
+                
+                # 모든 문서에서 후견인 필드를 N/A로 채우기
+                guardian_fields_filled = 0
+                for doc_name, doc_data in session["documents"].items():
+                    for g_field_name in doc_data["fields"].keys():
+                        if "guardian." in g_field_name:
+                            old_g_value = doc_data["fields"][g_field_name]
+                            if old_g_value == "":
+                                doc_data["fields"][g_field_name] = "N/A"
+                                doc_data["filled_count"] += 1
+                                guardian_fields_filled += 1
+                                print(f"[UPDATE_FIELD]   ✅ {doc_name}.{g_field_name} = N/A")
+                
+                print(f"[UPDATE_FIELD] ✅ 후견인 필드 {guardian_fields_filled}개를 N/A로 채움")
+                
+                # 세션 저장 (명시적으로 저장하여 다음 호출 시 반영되도록)
+                form_session_store[session_id] = session
+        
         doc["fields"][field_name] = value
         
         # 채워진 필드 수 업데이트
@@ -795,6 +892,237 @@ def close_form_session(session_id: str) -> Optional[Dict[str, Any]]:
     return session
 
 
+def validate_field_value(field_name: str, value: str) -> bool:
+    """
+    필드 타입에 따라 값의 유효성을 검증합니다.
+    유연한 검증: 명백히 잘못된 값만 필터링합니다.
+    
+    Returns:
+        True: 유효한 값 (또는 검증 통과)
+        False: 명백히 무효한 값 (무의미한 답변만)
+    """
+    if not value or value.strip() == "":
+        return False
+    
+    value = value.strip()
+    
+    # 명백히 무의미한 답변만 필터링 (짧고 의미 없는 답변)
+    # "네, 홍길동입니다" 같은 경우는 허용 (길이가 길면 정보 포함 가능)
+    invalid_short_responses = [
+        "아니요", "아뇨", "없어요", "없습니다", "없어",
+        "모르겠어요", "모르겠습니다", "모르겠어", "모름",
+        "필요없어요", "해당없어요", "해당 없어요",
+        "건너뛰", "스킵", "넘어가", "다음",
+    ]
+    
+    value_lower = value.lower()
+    # 매우 짧은 답변(5자 이하)이고 무의미한 답변인 경우만 필터링
+    if len(value) <= 5:
+        for invalid in invalid_short_responses:
+            if value_lower == invalid or value_lower.startswith(invalid):
+                print(f"[VALIDATION] ❌ 명백히 무의미한 짧은 답변: '{value}'")
+                return False
+    
+    # 긍정 답변("네", "예" 등)은 정보가 아니지만, 
+    # "네, 홍길동입니다" 같은 경우는 허용 (길이가 길면 정보 포함 가능)
+    if len(value) <= 3 and value_lower in ["네", "예", "좋아", "그래", "맞아", "알겠"]:
+        print(f"[VALIDATION] ❌ 정보 없는 긍정 답변: '{value}'")
+        return False
+    
+    # 필드 타입별 검증 (유연한 검증)
+    field_lower = field_name.lower()
+    
+    # 이름 필드 검증 (더 유연하게)
+    if ".name" in field_lower or field_lower.endswith("name"):
+        # 한글, 영문, 공백, 하이픈, 숫자, 일부 특수문자 허용 (예: "홍길동2세", "김철수(본인)")
+        # 너무 많은 특수문자나 숫자는 제한
+        cleaned = re.sub(r'[가-힣a-zA-Z\s\-]', '', value)
+        if len(cleaned) > len(value) * 0.3:  # 특수문자/숫자가 30% 이상이면 의심
+            print(f"[VALIDATION] ⚠️ 이름에 특수문자/숫자가 많음: '{value}' (허용하지만 경고)")
+        # 최소 길이 체크 (너무 짧으면 무의미)
+        if len(value.replace(" ", "").replace("-", "").replace("(", "").replace(")", "")) < 2:
+            print(f"[VALIDATION] ❌ 이름이 너무 짧음: '{value}'")
+            return False
+        # 최대 길이 체크
+        if len(value) > 100:  # 50 -> 100으로 완화
+            print(f"[VALIDATION] ❌ 이름이 너무 김: '{value}'")
+            return False
+        return True
+    
+    # 전화번호 필드 검증 (더 유연하게)
+    if ".number" in field_lower or ".phone" in field_lower or "mobile" in field_lower:
+        # 숫자, 하이픈, 공백, 괄호, 점 등 다양한 형식 허용
+        # 예: "010-1234-5678", "(02) 123-4567", "010.1234.5678", "010 1234 5678"
+        digits_only = re.sub(r'\D', '', value)
+        # 숫자 개수로만 검증 (8-15자리)
+        if len(digits_only) < 8 or len(digits_only) > 15:
+            print(f"[VALIDATION] ❌ 전화번호 길이 오류: '{value}' (숫자 {len(digits_only)}개)")
+            return False
+        # 숫자가 너무 적으면 무효
+        if len(digits_only) == 0:
+            print(f"[VALIDATION] ❌ 전화번호에 숫자가 없음: '{value}'")
+            return False
+        return True
+    
+    # 생년월일 필드 검증 (더 유연하게)
+    if "birthdate" in field_lower or "birth" in field_lower:
+        # 다양한 형식 허용: YYYY-MM-DD, YYYYMMDD, YYYY.MM.DD, YYYY/MM/DD 등
+        digits_only = re.sub(r'\D', '', value)
+        if len(digits_only) == 8:  # YYYYMMDD 형식
+            year_str = digits_only[:4]
+            try:
+                year = int(year_str)
+                if year < 1900 or year > 2100:
+                    print(f"[VALIDATION] ❌ 생년월일 년도 범위 오류: '{value}'")
+                    return False
+            except:
+                pass
+            return True
+        elif len(digits_only) == 6:  # YYMMDD 형식도 허용 (예: 900101)
+            return True
+        elif len(digits_only) >= 4:  # 최소 년도는 있어야 함
+            year_str = digits_only[:4]
+            try:
+                year = int(year_str)
+                if year < 1900 or year > 2100:
+                    print(f"[VALIDATION] ❌ 생년월일 년도 범위 오류: '{value}'")
+                    return False
+            except:
+                pass
+            return True
+        else:
+            print(f"[VALIDATION] ⚠️ 생년월일 형식이 명확하지 않음: '{value}' (허용하지만 경고)")
+            return True  # 엄격하게 거부하지 않고 허용
+    
+    # 주소 필드 검증 (더 유연하게)
+    if "address" in field_lower:
+        # 최소 길이 체크 완화 (3자 이상)
+        if len(value) < 3:
+            print(f"[VALIDATION] ❌ 주소가 너무 짧음: '{value}'")
+            return False
+        # 최대 길이 체크 완화
+        if len(value) > 300:  # 200 -> 300으로 완화
+            print(f"[VALIDATION] ❌ 주소가 너무 김: '{value}'")
+            return False
+        return True
+    
+    # 관계 필드 검증 (더 유연하게)
+    if "relationship" in field_lower:
+        # 한글, 영문, 공백, 숫자, 일부 특수문자 허용
+        # 최소 길이 체크만 (너무 짧으면 무의미)
+        if len(value.replace(" ", "")) < 1:
+            print(f"[VALIDATION] ❌ 관계가 너무 짧음: '{value}'")
+            return False
+        if len(value) > 50:  # 20 -> 50으로 완화
+            print(f"[VALIDATION] ❌ 관계가 너무 김: '{value}'")
+            return False
+        return True
+    
+    # 계좌번호 필드 검증 (더 유연하게)
+    if "account" in field_lower:
+        # 숫자만 추출해서 길이 체크 (하이픈, 공백 등 무시)
+        digits_only = re.sub(r'\D', '', value)
+        if len(digits_only) < 8 or len(digits_only) > 30:  # 20 -> 30으로 완화
+            print(f"[VALIDATION] ❌ 계좌번호 길이 오류: '{value}' (숫자 {len(digits_only)}개)")
+            return False
+        if len(digits_only) == 0:
+            print(f"[VALIDATION] ❌ 계좌번호에 숫자가 없음: '{value}'")
+            return False
+        return True
+    
+    # 은행명 필드 검증 (더 유연하게)
+    if "bank_name" in field_lower or "bank" in field_lower:
+        # 한글, 영문, 숫자, 공백, 일부 특수문자 허용
+        # 최소 길이 체크만
+        if len(value.replace(" ", "")) < 1:
+            print(f"[VALIDATION] ❌ 은행명이 너무 짧음: '{value}'")
+            return False
+        if len(value) > 100:  # 50 -> 100으로 완화
+            print(f"[VALIDATION] ❌ 은행명이 너무 김: '{value}'")
+            return False
+        return True
+    
+    # 체크박스 필드 (V, N/A만 허용)
+    if "application_reason" in field_lower or "civil_service_items" in field_lower:
+        if value.upper() in ["V", "N/A", ""]:
+            return True
+        # 그 외는 무효
+        print(f"[VALIDATION] ❌ 체크박스 값 오류: '{value}' (V 또는 N/A만 허용)")
+        return False
+    
+    # 기본 검증: 명백히 잘못된 경우만 거부
+    # 빈 값은 이미 위에서 처리됨
+    if len(value) > 1000:  # 500 -> 1000으로 완화 (너무 긴 값만 거부)
+        print(f"[VALIDATION] ❌ 값이 너무 김: '{value}' (1000자 초과)")
+        return False
+    
+    # 기본적으로 통과 (다른 특수 필드들은 허용)
+    # 유연한 검증: 명백히 잘못된 값만 거부하고, 나머지는 허용
+    return True
+
+
+def generate_natural_question(field_name: str, description: str) -> str:
+    """
+    필드 타입에 따라 자연스러운 질문을 생성합니다.
+    
+    - 체크박스 필드: "~에 해당하시나요?" 또는 "~을/를 원하시나요?"
+    - 일반 필드: "~은/는 어떻게 되시나요?" 또는 "~을/를 알려주세요"
+    """
+    # 체크박스 필드 패턴 (필드명 기준)
+    checkbox_patterns = [
+        "application_reason.",  # 신청사유
+        "civil_service_items.", # 민원내용
+        "checkbox",
+        "check_",
+        "_check",
+        "request",  # ~신청
+        "issuance", # ~발급
+        "appeal",   # 이의신청
+    ]
+    
+    # 체크박스 설명에 자주 나오는 패턴 (설명 기준)
+    checkbox_desc_endings = [
+        "신청",
+        "발급", 
+        "경우",
+        "자",  # ~한 자
+    ]
+    
+    is_checkbox = False
+    
+    # 필드명으로 체크박스 판단
+    field_lower = field_name.lower()
+    for pattern in checkbox_patterns:
+        if pattern in field_lower:
+            is_checkbox = True
+            break
+    
+    # 설명으로 체크박스 판단
+    if not is_checkbox:
+        for ending in checkbox_desc_endings:
+            if description.endswith(ending):
+                is_checkbox = True
+                break
+    
+    if is_checkbox:
+        # 체크박스 필드용 질문
+        return f"{description}에 해당하시나요?"
+    else:
+        # 일반 필드용 질문 - 자연스러운 조사 사용
+        # 받침 여부에 따라 은/는 구분 (간단한 로직)
+        last_char = description[-1] if description else ''
+        
+        # 받침 있는 글자인지 확인 (유니코드 기준)
+        if last_char and '가' <= last_char <= '힣':
+            # 한글 유니코드: (char - 0xAC00) % 28 == 0 이면 받침 없음
+            has_batchim = (ord(last_char) - 0xAC00) % 28 != 0
+        else:
+            has_batchim = False
+        
+        particle = "은" if has_batchim else "는"
+        return f"{description}{particle} 어떻게 되시나요?"
+
+
 # 폼 작성 유도 프롬프트
 form_filling_prompt = ChatPromptTemplate.from_messages([
     ("system", """반드시 한국어로만 응답하세요. 중국어, 한자, 영어 사용 금지.
@@ -812,15 +1140,23 @@ form_filling_prompt = ChatPromptTemplate.from_messages([
 
 규칙:
 1. 반드시 한국어만 사용하세요.
-2. "이미 수집 완료" 목록에 있는 정보는 절대 다시 묻지 마세요.
+2. ⚠️⚠️⚠️ "이미 수집 완료" 목록에 있는 정보는 절대 다시 묻지 마세요! ⚠️⚠️⚠️
+   - 목록에 있는 필드 설명과 같은 내용을 묻지 마세요.
+   - 목록에 있는 필드 설명과 유사한 내용도 묻지 마세요.
+   - 예: "이름"이 이미 수집 완료면 "성함", "성명" 같은 것도 묻지 마세요.
+   - 예: "주소"가 이미 수집 완료면 "거주지", "사는 곳" 같은 것도 묻지 마세요.
+   - 대화 히스토리를 확인해서 이미 물어본 내용도 다시 묻지 마세요.
 3. "아직 필요한 정보" 목록의 첫 번째 항목만 질문하세요.
-4. 응답 형식: "네, OOO 확인했습니다. (질문)"
+4. 응답 형식: "네, OOO 확인했습니다. (질문)" 또는 자연스러운 대화 형식
 5. 반드시 물음표(?)로 끝나는 질문을 하세요.
 6. 한 번에 1개 정보만 물어보세요.
 7. "완료", "감사합니다", "끝" 같은 말 하지 마세요.
 8. "위와 같음", "상동", "동일" 같은 표현 사용 금지.
 9. 사용자에게 "필요한 게 있나요?" 묻지 마세요. 당신이 직접 질문하세요.
-10. "후견인이 있으신가요?" 같은 질문이 나오면, 사용자가 "없다"고 답하면 후견인 관련 모든 필드는 N/A로 처리되고 더 이상 묻지 않습니다. "있다"고 답하면 후견인 관련 필드들을 순차적으로 질문하세요."""),
+10. "후견인이 있으신가요?" 같은 질문이 나오면, 사용자가 "없다"고 답하면 후견인 관련 모든 필드는 N/A로 처리되고 더 이상 묻지 않습니다. "있다"고 답하면 후견인 관련 필드들을 순차적으로 질문하세요.
+11. 사용자가 명확하지 않은 답변을 했거나 정보가 없는 경우, 자연스럽게 같은 질문을 다시 하세요. 예: "죄송합니다. 다시 한 번 말씀해주시겠어요? [질문]" 또는 "알겠습니다. [질문]"
+12. 대화를 유연하고 자연스럽게 진행하세요. 사용자의 다양한 표현을 이해하고 적절히 응답하세요.
+13. 질문하기 전에 반드시 "이미 수집 완료" 목록을 확인하세요. 목록에 있는 내용과 겹치면 절대 묻지 마세요."""),
     MessagesPlaceholder(variable_name="history"),
     ("human", "{user_input}")
 ])
@@ -943,13 +1279,40 @@ async def process_form_conversation(
     
     # 후견인 존재 여부 확인 단계 처리
     if unfilled and len(unfilled) > 0 and unfilled[0]["field"] == "__guardian_exists__":
+        # 이미 "없다"고 답한 경우는 더 이상 질문하지 않음
+        if session.get("guardian_checked") and session.get("guardian_exists") == False:
+            print(f"[TALK_TO_FILL] ⚠️ 이미 후견인 없음으로 처리됨 - 다음 필드로 진행")
+            updated_unfilled = get_unfilled_fields(session_id)
+            if updated_unfilled:
+                next_field = updated_unfilled[0]
+                next_question = generate_natural_question(next_field['field'], next_field['description'])
+                return {
+                    "response": next_question,
+                    "extracted_fields": {},
+                    "form_state": {
+                        "category": session["category"],
+                        "current_document": current_doc,
+                        "total_fields": session.get("initial_total_fields", 0),
+                        "documents": {
+                            doc_name: {
+                                "filled_count": doc["filled_count"],
+                                "total_count": doc["total_count"],
+                                "fields": doc["fields"]
+                            }
+                            for doc_name, doc in session["documents"].items()
+                        }
+                    },
+                    "unfilled_count": len(updated_unfilled),
+                    "completed": False
+                }
+        
         # 후견인 존재 여부 질문에 대한 사용자 응답 처리
-        negative_keywords = ["없", "아니", "아뇨", "아니요", "필요없", "해당없", "해당 없", "없어요", "없습니다"]
-        positive_keywords = ["있", "예", "네", "있어요", "있습니다", "있어"]
+        negative_keywords = ["없", "아니", "아뇨", "아니요", "필요없", "해당없", "해당 없", "없어요", "없습니다", "없음", "없네", "없는", "없다", "없어", "없다고", "안", "안해", "안해요", "안합니다", "하지않", "하지 않"]
+        positive_keywords = ["있", "예", "네", "있어요", "있습니다", "있어", "있음", "있네", "있는", "있다", "있고", "있는데"]
         
         user_input_lower = user_input.lower()
-        has_negative = any(keyword in user_input for keyword in negative_keywords)
-        has_positive = any(keyword in user_input for keyword in positive_keywords)
+        has_negative = any(keyword in user_input_lower for keyword in negative_keywords)
+        has_positive = any(keyword in user_input_lower for keyword in positive_keywords)
         
         if has_negative and not has_positive:
             # 후견인이 없는 경우: 모든 후견인 필드를 N/A로 채우기
@@ -971,12 +1334,16 @@ async def process_form_conversation(
             
             print(f"[TALK_TO_FILL] ✅ 후견인 필드 {guardian_fields_filled}개를 N/A로 채움")
             
+            # 세션 저장 (명시적으로 저장하여 다음 호출 시 반영되도록)
+            form_session_store[session_id] = session
+            
             # 다음 필드로 진행
             updated_unfilled = get_unfilled_fields(session_id)
             if updated_unfilled:
-                next_field_desc = updated_unfilled[0]['description']
+                next_field = updated_unfilled[0]
+                next_question = generate_natural_question(next_field['field'], next_field['description'])
                 return {
-                    "response": f"알겠습니다. 후견인 관련 정보는 제외하겠습니다. {next_field_desc}는 어떻게 되시나요?",
+                    "response": f"알겠습니다. 후견인 관련 정보는 제외하겠습니다. {next_question}",
                     "extracted_fields": {},
                     "form_state": {
                         "category": session["category"],
@@ -1000,12 +1367,16 @@ async def process_form_conversation(
             session["guardian_checked"] = True
             session["guardian_exists"] = True
             
+            # 세션 저장 (명시적으로 저장하여 다음 호출 시 반영되도록)
+            form_session_store[session_id] = session
+            
             # 다음 필드로 진행 (후견인 필드 중 첫 번째)
             updated_unfilled = get_unfilled_fields(session_id)
             if updated_unfilled:
-                next_field_desc = updated_unfilled[0]['description']
+                next_field = updated_unfilled[0]
+                next_question = generate_natural_question(next_field['field'], next_field['description'])
                 return {
-                    "response": f"알겠습니다. {next_field_desc}는 어떻게 되시나요?",
+                    "response": f"알겠습니다. {next_question}",
                     "extracted_fields": {},
                     "form_state": {
                         "category": session["category"],
@@ -1098,6 +1469,29 @@ async def process_form_conversation(
         except Exception as e:
             print(f"[TALK_TO_FILL] ❌ 정보 추출 오류: {e}")
             extracted = {}
+        
+        # 추출된 정보 검증 및 필터링
+        validated_extracted = {}
+        for field_name, value in extracted.items():
+            if value is not None and value != "":
+                if validate_field_value(field_name, value):
+                    validated_extracted[field_name] = value
+                    print(f"[VALIDATION] ✅ 유효한 값: {field_name} = '{value}'")
+                else:
+                    print(f"[VALIDATION] ❌ 무효한 값 제거: {field_name} = '{value}'")
+            elif value == "":
+                # 빈 문자열은 체크박스 필드에서 유효할 수 있음
+                validated_extracted[field_name] = value
+        
+        print(f"[TALK_TO_FILL] 📝 검증 완료 - 원본: {len(extracted)}개, 유효: {len(validated_extracted)}개")
+        extracted = validated_extracted  # 검증된 값만 사용
+        
+        # 검증 실패 시 (유효한 값이 없으면) LLM이 자연스럽게 재질문하도록 함
+        # 하드코딩된 메시지 대신 LLM이 처리하도록 넘김 (extracted가 비어있으면 LLM이 자연스럽게 재질문)
+        if not extracted and unfilled:
+            print(f"[TALK_TO_FILL] ⚠️ 검증 실패 - 유효한 정보가 없음. LLM이 자연스럽게 재질문하도록 합니다.")
+            # extracted를 비워두면 LLM이 자연스럽게 재질문할 것임
+            # 바로 리턴하지 않고 LLM 처리로 넘김
         
         # 추출된 정보로 폼 업데이트
         # 빈 문자열("")도 유효한 값 (체크박스 필드에서 "체크하지 않음"을 의미)
@@ -1292,10 +1686,19 @@ async def process_form_conversation(
     
     if filled_info_list:
         # 모든 채워진 정보를 전달 (제한 없이)
-        filled_info_str = "\n".join(filled_info_list)
-        filled_info_str += f"\n\n🚨🚨🚨 위 {len(filled_info_list)}개 정보는 이미 수집 완료! 절대 다시 묻지 마세요! 🚨🚨🚨"
+        # 더 명확하게 필드 설명과 값을 함께 표시
+        filled_info_str = "=" * 50 + "\n"
+        filled_info_str += "⚠️ 이미 수집 완료된 정보 (절대 다시 묻지 마세요!) ⚠️\n"
+        filled_info_str += "=" * 50 + "\n"
+        for info in filled_info_list:
+            filled_info_str += info + "\n"
+        filled_info_str += "=" * 50 + "\n"
+        filled_info_str += f"\n🚨 중요: 위 {len(filled_info_list)}개 정보는 이미 수집 완료되었습니다!\n"
+        filled_info_str += "🚨 이 정보들과 관련된 질문은 절대 하지 마세요!\n"
+        filled_info_str += "🚨 필드 설명이 다르더라도 같은 의미면 묻지 마세요!\n"
+        filled_info_str += "🚨 예: '이름'이 있으면 '성함', '성명' 같은 것도 묻지 마세요!\n"
     else:
-        filled_info_str = "(아직 없음)"
+        filled_info_str = "(아직 수집된 정보 없음)"
     
     # 방금 추출된 정보 정리 (사용자 답변 확인용)
     just_extracted_str = ""
@@ -1422,8 +1825,9 @@ async def process_form_conversation(
             
             # 다음 필드로 질문 생성
             if unfilled and len(unfilled) > 0:
-                next_field_desc = unfilled[0]['description']
-                response_text = f"알겠습니다. {next_field_desc}는 어떻게 되시나요?"
+                next_field = unfilled[0]
+                next_question = generate_natural_question(next_field['field'], next_field['description'])
+                response_text = f"알겠습니다. {next_question}"
                 print(f"[TALK_TO_FILL]   - ✅ 수정된 응답: {response_text}")
             else:
                 response_text = "다음 정보를 알려주시겠어요?"
